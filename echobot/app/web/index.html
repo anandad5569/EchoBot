@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EchoBot Live2D</title>
+    <link rel="icon" href="/favicon.ico" type="image/svg+xml">
+    <link rel="stylesheet" href="/web/assets/styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <section class="stage-panel">
+            <div class="stage-header">
+                <div class="stage-header-meta">
+                    <p class="eyebrow">EchoBot Web Console</p>
+                    <span id="connection-badge" class="status-badge status-idle">初始化中</span>
+                    <span id="session-label" class="muted-text">会话: default</span>
+                </div>
+                <div class="stage-actions">
+                    <button id="reset-view-button" class="ghost-button" type="button">重置模型</button>
+                    <button id="stop-audio-button" class="ghost-button" type="button">停止语音</button>
+                    <button id="stop-agent-button" class="ghost-button stop-agent-button" type="button" disabled>停止任务</button>
+                </div>
+            </div>
+            <div id="live2d-stage" class="live2d-stage">
+                <div id="stage-background-image" class="stage-background-image" hidden></div>
+                <canvas id="live2d-canvas"></canvas>
+                <div id="stage-light-back" class="stage-light stage-light-back"></div>
+                <div id="stage-light-rim" class="stage-light stage-light-rim"></div>
+                <div id="stage-gradient" class="stage-gradient"></div>
+                <div id="stage-vignette" class="stage-vignette"></div>
+                <div id="stage-grain" class="stage-grain"></div>
+                <div class="stage-hint">
+                    <span>拖拽模型移动</span>
+                    <span>滚轮缩放</span>
+                </div>
+                <div id="stage-message" class="stage-message">正在加载 Live2D 模型…</div>
+            </div>
+        </section>
+
+        <aside id="chat-panel" class="chat-panel">
+            <section id="session-sidebar" class="session-sidebar" aria-hidden="true">
+                <div class="session-sidebar-header">
+                    <div>
+                        <p class="section-title">会话列表</p>
+                        <span id="session-sidebar-summary" class="muted-text">准备加载会话…</span>
+                    </div>
+                    <button
+                        id="session-sidebar-close"
+                        class="ghost-button ghost-button-compact"
+                        type="button"
+                    >
+                        隐藏
+                    </button>
+                </div>
+                <div class="session-sidebar-toolbar">
+                    <button id="session-create-button" class="primary-button" type="button">
+                        新建会话
+                    </button>
+                    <button
+                        id="session-refresh-button"
+                        class="ghost-button ghost-button-compact"
+                        type="button"
+                    >
+                        刷新
+                    </button>
+                </div>
+                <div id="session-sidebar-status" class="muted-text session-sidebar-status">
+                    正在加载会话…
+                </div>
+                <div id="session-list" class="session-list"></div>
+            </section>
+            <button
+                id="session-sidebar-backdrop"
+                class="session-sidebar-backdrop"
+                type="button"
+                hidden
+                aria-label="关闭会话列表"
+            ></button>
+
+            <section id="role-sidebar" class="role-sidebar" aria-hidden="true">
+                <div class="role-sidebar-header">
+                    <div>
+                        <p class="section-title">角色卡</p>
+                        <span id="role-status" class="muted-text role-sidebar-status">正在加载角色卡…</span>
+                    </div>
+                    <button
+                        id="role-sidebar-close"
+                        class="ghost-button ghost-button-compact"
+                        type="button"
+                    >
+                        隐藏
+                    </button>
+                </div>
+                <div class="role-sidebar-body">
+                    <div class="field-grid role-field-grid">
+                        <label class="field">
+                            <span>当前角色</span>
+                            <select id="role-select"></select>
+                        </label>
+                    </div>
+                    <div class="role-toolbar">
+                        <button id="role-refresh-button" class="ghost-button ghost-button-compact" type="button">
+                            刷新
+                        </button>
+                        <button id="role-new-button" class="ghost-button ghost-button-compact" type="button">
+                            新建
+                        </button>
+                        <button id="role-edit-button" class="ghost-button ghost-button-compact" type="button">
+                            编辑
+                        </button>
+                        <button id="role-delete-button" class="ghost-button ghost-button-compact ghost-button-danger" type="button">
+                            删除
+                        </button>
+                    </div>
+                    <div id="role-preview" class="role-preview">
+                        <p class="section-title">角色卡内容</p>
+                        <pre id="role-prompt-preview" class="role-preview-content">正在加载角色卡内容…</pre>
+                    </div>
+                    <div id="role-editor" class="role-editor" hidden>
+                        <p id="role-editor-title" class="section-title">角色卡编辑</p>
+                        <label class="field">
+                            <span>角色名</span>
+                            <input id="role-name-input" type="text" placeholder="例如：助手猫娘">
+                        </label>
+                        <label class="field">
+                            <span>角色卡内容</span>
+                            <textarea id="role-prompt-input" rows="10" placeholder="在这里填写角色卡内容。"></textarea>
+                        </label>
+                        <div class="role-editor-actions">
+                            <button id="role-save-button" class="primary-button" type="button">保存</button>
+                            <button id="role-cancel-button" class="ghost-button" type="button">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <button
+                id="role-sidebar-backdrop"
+                class="role-sidebar-backdrop"
+                type="button"
+                hidden
+                aria-label="关闭角色卡"
+            ></button>
+
+            <div class="chat-main">
+            <details id="settings-panel" class="panel-section settings-panel">
+                <summary class="settings-summary">
+                    <div class="settings-summary-main">
+                        <p class="section-title">控制面板</p>
+                    </div>
+                    <div class="panel-header-actions settings-summary-actions">
+                        <button
+                            id="session-sidebar-toggle"
+                            class="ghost-button ghost-button-compact"
+                            type="button"
+                        >
+                            会话列表
+                        </button>
+                        <button
+                            id="role-sidebar-toggle"
+                            class="ghost-button ghost-button-compact"
+                            type="button"
+                        >
+                            角色卡
+                        </button>
+                        <span class="settings-summary-icon" aria-hidden="true"></span>
+                    </div>
+                </summary>
+                <div class="settings-panel-body">
+                    <div class="field-grid">
+                        <label class="field">
+                            <span>TTS 语音模型</span>
+                            <select id="tts-provider-select"></select>
+                        </label>
+                        <label class="field">
+                            <span>TTS 音色选择</span>
+                            <select id="voice-select"></select>
+                        </label>
+                        <label class="field field-span-full">
+                            <span>路由模式</span>
+                            <select id="route-mode-select">
+                                <option value="auto">自动决策</option>
+                                <option value="chat_only">纯聊天</option>
+                                <option value="force_agent">强制 Agent</option>
+                            </select>
+                        </label>
+                    </div>
+                    <details id="live2d-panel" class="stage-background-panel" open>
+                        <summary class="stage-background-header">
+                            <div class="stage-background-header-main">
+                                <p class="section-title">Live2D 模型</p>
+                            </div>
+                        </summary>
+                        <div class="stage-background-panel-body">
+                            <div class="field-grid">
+                                <label class="field field-span-full">
+                                    <span>Live2D 模型</span>
+                                    <select id="model-select"></select>
+                                </label>
+                            </div>
+                            <div class="stage-background-actions">
+                                <button
+                                    id="live2d-upload-button"
+                                    class="ghost-button ghost-button-compact"
+                                    type="button"
+                                >
+                                    上传 Live2D 文件夹
+                                </button>
+                                <input
+                                    id="live2d-upload-input"
+                                    type="file"
+                                    webkitdirectory
+                                    directory
+                                    multiple
+                                    hidden
+                                >
+                            </div>
+                        </div>
+                    </details>
+                    <details id="stage-background-panel" class="stage-background-panel" open>
+                        <summary class="stage-background-header">
+                            <div class="stage-background-header-main">
+                                <p class="section-title">舞台背景</p>
+                            </div>
+                        </summary>
+                        <div class="stage-background-panel-body">
+                            <div class="field-grid">
+                                <label class="field field-span-full">
+                                    <span>舞台背景</span>
+                                    <select id="stage-background-select"></select>
+                                </label>
+                            </div>
+                            <div class="stage-background-actions">
+                                <button
+                                    id="stage-background-upload-button"
+                                    class="ghost-button ghost-button-compact"
+                                    type="button"
+                                >
+                                    上传背景
+                                </button>
+                                <button
+                                    id="stage-background-reset-button"
+                                    class="ghost-button ghost-button-compact"
+                                    type="button"
+                                >
+                                    恢复默认
+                                </button>
+                                <input
+                                    id="stage-background-upload-input"
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                                    hidden
+                                >
+                            </div>
+                            <div class="stage-background-transform-panel">
+                                <div class="stage-background-transform-header">
+                                    <p class="section-title">背景调整</p>
+                                    <button
+                                        id="stage-background-transform-reset-button"
+                                        class="ghost-button ghost-button-compact"
+                                        type="button"
+                                    >
+                                        重置取景
+                                    </button>
+                                </div>
+                                <div class="stage-background-transform-grid">
+                                    <label class="field">
+                                        <span class="field-label-with-value">
+                                            <span>水平位置</span>
+                                            <output id="stage-background-position-x-value" for="stage-background-position-x-input">50%</output>
+                                        </span>
+                                        <input
+                                            id="stage-background-position-x-input"
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value="50"
+                                        >
+                                    </label>
+                                    <label class="field">
+                                        <span class="field-label-with-value">
+                                            <span>垂直位置</span>
+                                            <output id="stage-background-position-y-value" for="stage-background-position-y-input">50%</output>
+                                        </span>
+                                        <input
+                                            id="stage-background-position-y-input"
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value="50"
+                                        >
+                                    </label>
+                                    <label class="field">
+                                        <span class="field-label-with-value">
+                                            <span>缩放</span>
+                                            <output id="stage-background-scale-value" for="stage-background-scale-input">100%</output>
+                                        </span>
+                                        <input
+                                            id="stage-background-scale-input"
+                                            type="range"
+                                            min="60"
+                                            max="200"
+                                            step="1"
+                                            value="100"
+                                        >
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                    <details id="stage-effects-panel" class="stage-effects-panel" open>
+                        <summary class="stage-effects-header">
+                            <p class="section-title">光影效果</p>
+                            <button
+                                id="stage-effects-reset-button"
+                                class="ghost-button ghost-button-compact"
+                                type="button"
+                            >
+                                重置参数
+                            </button>
+                        </summary>
+                        <div class="stage-effects-panel-body">
+                            <div class="toggle-row">
+                                <label class="toggle-item">
+                                    <input id="stage-effects-enabled-checkbox" type="checkbox" checked>
+                                    <span>全局开启</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input id="stage-effects-background-blur-checkbox" type="checkbox" checked>
+                                    <span>背景模糊</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input id="stage-effects-light-enabled-checkbox" type="checkbox" checked>
+                                    <span>光位效果</span>
+                                </label>
+                            </div>
+                            <div class="toggle-row">
+                                <label class="toggle-item">
+                                    <input id="stage-effects-light-float-checkbox" type="checkbox" checked>
+                                    <span>光位漂移</span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input id="stage-effects-particles-enabled-checkbox" type="checkbox" checked>
+                                    <span>&#31354;&#27668;&#31890;&#23376;</span>
+                                </label>
+                            </div>
+                            <div class="stage-effects-grid">
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>背景模糊</span>
+                                        <output id="stage-effects-background-blur-value" for="stage-effects-background-blur-input">16</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-background-blur-input"
+                                        type="range"
+                                        min="0"
+                                        max="16"
+                                        step="0.5"
+                                        value="16"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>光位 X</span>
+                                        <output id="stage-effects-light-x-value" for="stage-effects-light-x-input">0%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-light-x-input"
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="0"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>光位 Y</span>
+                                        <output id="stage-effects-light-y-value" for="stage-effects-light-y-input">0%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-light-y-input"
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="0"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>光晕强度</span>
+                                        <output id="stage-effects-glow-value" for="stage-effects-glow-input">25%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-glow-input"
+                                        type="range"
+                                        min="0"
+                                        max="160"
+                                        step="1"
+                                        value="25"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>暗角强度</span>
+                                        <output id="stage-effects-vignette-value" for="stage-effects-vignette-input">23%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-vignette-input"
+                                        type="range"
+                                        min="0"
+                                        max="60"
+                                        step="1"
+                                        value="23"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#39063;&#31890;&#24378;&#24230;</span>
+                                        <output id="stage-effects-grain-value" for="stage-effects-grain-input">16%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-grain-input"
+                                        type="range"
+                                        min="0"
+                                        max="40"
+                                        step="1"
+                                        value="16"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#31890;&#23376;&#23494;&#24230;</span>
+                                        <output id="stage-effects-particle-density-value" for="stage-effects-particle-density-input">30%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-particle-density-input"
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        step="1"
+                                        value="30"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#31890;&#23376;&#36879;&#26126;&#24230;</span>
+                                        <output id="stage-effects-particle-opacity-value" for="stage-effects-particle-opacity-input">45%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-particle-opacity-input"
+                                        type="range"
+                                        min="0"
+                                        max="160"
+                                        step="1"
+                                        value="45"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#31890;&#23376;&#23610;&#23544;</span>
+                                        <output id="stage-effects-particle-size-value" for="stage-effects-particle-size-input">150%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-particle-size-input"
+                                        type="range"
+                                        min="40"
+                                        max="240"
+                                        step="1"
+                                        value="150"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#31890;&#23376;&#36895;&#24230;</span>
+                                        <output id="stage-effects-particle-speed-value" for="stage-effects-particle-speed-input">80%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-particle-speed-input"
+                                        type="range"
+                                        min="0"
+                                        max="260"
+                                        step="1"
+                                        value="80"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#33394;&#35843;</span>
+                                        <output id="stage-effects-hue-value" for="stage-effects-hue-input">0&deg;</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-hue-input"
+                                        type="range"
+                                        min="-180"
+                                        max="180"
+                                        step="1"
+                                        value="0"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#39281;&#21644;&#24230;</span>
+                                        <output id="stage-effects-saturation-value" for="stage-effects-saturation-input">100%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-saturation-input"
+                                        type="range"
+                                        min="0"
+                                        max="200"
+                                        step="1"
+                                        value="100"
+                                    >
+                                </label>
+                                <label class="field">
+                                    <span class="field-label-with-value">
+                                        <span>&#23545;&#27604;&#24230;</span>
+                                        <output id="stage-effects-contrast-value" for="stage-effects-contrast-input">100%</output>
+                                    </span>
+                                    <input
+                                        id="stage-effects-contrast-input"
+                                        type="range"
+                                        min="0"
+                                        max="200"
+                                        step="1"
+                                        value="100"
+                                    >
+                                </label>
+                            </div>
+                        </div>
+                    </details>
+                    <div class="toggle-row">
+                        <label class="toggle-item">
+                            <input id="live2d-mouse-follow-checkbox" type="checkbox" checked>
+                            <span>Live 2D 眼神跟随</span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <label class="toggle-item">
+                            <input id="auto-tts-checkbox" type="checkbox" checked>
+                            <span>开启语音播报</span>
+                        </label>
+                        <span id="tts-detail" class="muted-text">准备加载 TTS 配置…</span>
+                    </div>
+                    <div class="voice-input-row">
+                        <div class="voice-input-controls">
+                            <label class="toggle-item">
+                                <input id="always-listen-checkbox" type="checkbox">
+                                <span>常开麦克风</span>
+                            </label>
+                        </div>
+                        <span id="asr-detail" class="muted-text">正在准备语音识别…</span>
+                    </div>
+
+                    <details id="cron-panel" class="cron-panel">
+                        <summary class="cron-summary">
+                            <div class="cron-summary-main">
+                                <p class="section-title">CRON 定时任务</p>
+                                <span id="cron-summary-text" class="muted-text">已隐藏</span>
+                            </div>
+                            <span class="cron-summary-icon" aria-hidden="true"></span>
+                        </summary>
+                        <div class="cron-panel-body">
+                            <div class="cron-toolbar">
+                                <span id="cron-status" class="muted-text">展开后加载 CRON 定时任务</span>
+                                <button
+                                    id="cron-refresh-button"
+                                    class="ghost-button ghost-button-compact"
+                                    type="button"
+                                >
+                                    刷新
+                                </button>
+                            </div>
+                            <div id="cron-jobs" class="cron-jobs">
+                                <p class="cron-empty">当前没有 CRON 定时任务。</p>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details id="heartbeat-panel" class="heartbeat-panel">
+                        <summary class="heartbeat-summary">
+                            <div class="heartbeat-summary-main">
+                                <p class="section-title">HEARTBEAT 周期任务</p>
+                                <span id="heartbeat-summary-text" class="muted-text">已隐藏</span>
+                            </div>
+                            <span class="heartbeat-summary-icon" aria-hidden="true"></span>
+                        </summary>
+                        <div class="heartbeat-panel-body">
+                            <div class="heartbeat-toolbar">
+                                <div class="heartbeat-toolbar-text">
+                                    <span id="heartbeat-status" class="muted-text">展开后加载 HEARTBEAT 周期任务</span>
+                                    <p id="heartbeat-meta" class="muted-text heartbeat-meta">
+                                        间隔会在加载后显示
+                                    </p>
+                                </div>
+                                <div class="heartbeat-toolbar-actions">
+                                    <button
+                                        id="heartbeat-refresh-button"
+                                        class="ghost-button ghost-button-compact"
+                                        type="button"
+                                    >
+                                        刷新
+                                    </button>
+                                    <button
+                                        id="heartbeat-save-button"
+                                        class="primary-button"
+                                        type="button"
+                                        disabled
+                                    >
+                                        保存
+                                    </button>
+                                </div>
+                            </div>
+                            <label class="field heartbeat-field">
+                                <span>HEARTBEAT.md</span>
+                                <textarea
+                                    id="heartbeat-input"
+                                    class="heartbeat-input"
+                                    rows="10"
+                                    placeholder="在这里维护宽松的周期任务，例如定期检查待办、复查长期事项等。"
+                                ></textarea>
+                            </label>
+                        </div>
+                    </details>
+                </div>
+            </details>
+
+            <section class="conversation-panel" aria-label="当前会话">
+                <div class="panel-section messages-section">
+                    <div class="messages-header">
+                        <p class="section-title">对话</p>
+                        <span id="run-status" class="muted-text message-status">等待输入</span>
+                    </div>
+                    <details id="agent-trace-panel" class="agent-trace-panel" hidden>
+                        <summary class="agent-trace-summary">
+                            <div class="agent-trace-summary-main">
+                                <p class="section-title">Agent 执行日志</p>
+                                <span id="agent-trace-summary-text" class="muted-text">
+                                    等待后台任务
+                                </span>
+                            </div>
+                            <span id="agent-trace-count" class="agent-trace-count">0 条</span>
+                        </summary>
+                        <div class="agent-trace-panel-body">
+                            <div id="agent-trace-events" class="agent-trace-events"></div>
+                        </div>
+                    </details>
+                    <div id="messages" class="messages"></div>
+                </div>
+
+                <form id="chat-form" class="composer">
+                    <label class="composer-label" for="prompt-input">输入消息</label>
+                    <textarea
+                        id="prompt-input"
+                        rows="4"
+                        placeholder="例如：今天帮我安排一下工作重点。"
+                    ></textarea>
+                    <div id="composer-images" class="composer-images" hidden></div>
+                    <input
+                        id="composer-image-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/*"
+                        multiple
+                        hidden
+                    >
+                    <div
+                        id="composer-status-banner"
+                        class="composer-status-banner"
+                        role="status"
+                        aria-live="polite"
+                        hidden
+                    >
+                        后台任务运行中，暂时无法发送文本或开始录音。可点击上方“停止任务”终止当前任务。
+                    </div>
+                    <div class="composer-actions">
+                        <span class="muted-text">Shift + Enter 换行</span>
+                        <div class="composer-action-buttons">
+                            <button
+                                id="composer-image-button"
+                                class="ghost-button icon-button"
+                                type="button"
+                                title="添加图片"
+                                aria-label="添加图片"
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path
+                                        d="M6 4.5A2.5 2.5 0 0 0 3.5 7v10A2.5 2.5 0 0 0 6 19.5h12a2.5 2.5 0 0 0 2.5-2.5V7A2.5 2.5 0 0 0 18 4.5H6Zm0 1.5h12c.55 0 1 .45 1 1v8.26l-3.22-3.22a1.5 1.5 0 0 0-2.12 0l-1.9 1.9-2.45-2.45a1.5 1.5 0 0 0-2.12 0L5 14.67V7c0-.55.45-1 1-1Zm2.75 2.25a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5ZM5 16.79l3.37-3.37 3.03 3.03 2.96-2.96a.5.5 0 0 1 .71 0L18.29 17H6a1 1 0 0 1-1-1v-.21Z"
+                                        fill="currentColor"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                id="record-button"
+                                class="ghost-button icon-button record-button"
+                                type="button"
+                                title="开始录音"
+                                aria-label="开始录音"
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path
+                                        d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V7a3.5 3.5 0 1 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Zm6-3.5a1 1 0 0 0-2 0 4 4 0 0 1-8 0 1 1 0 0 0-2 0 6 6 0 0 0 5 5.91V21a1 1 0 1 0 2 0v-3.09A6 6 0 0 0 18 12Z"
+                                        fill="currentColor"
+                                    />
+                                </svg>
+                            </button>
+                            <button id="send-button" class="primary-button" type="submit">发送</button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+            </div>
+        </aside>
+    </div>
+
+    <dialog
+        id="message-image-dialog"
+        class="message-image-dialog"
+        aria-label="图片预览"
+    >
+        <div class="message-image-dialog-body">
+            <div class="message-image-dialog-actions">
+                <button
+                    id="message-image-dialog-close"
+                    class="ghost-button ghost-button-compact"
+                    type="button"
+                >
+                    关闭
+                </button>
+            </div>
+            <img
+                id="message-image-dialog-image"
+                class="message-image-dialog-image"
+                src=""
+                alt="图片预览"
+            >
+        </div>
+    </dialog>
+
+    <script src="/web/assets/vendor/pixi.min.js"></script>
+    <script src="/web/assets/vendor/live2dcubismcore.min.js"></script>
+    <script src="/web/assets/vendor/cubism4.min.js"></script>
+    <script type="module" src="/web/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <defs>
+    <linearGradient id="acgGrad" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF9A9E"/>
+      <stop offset="50%" stop-color="#FECFEF"/>
+      <stop offset="100%" stop-color="#A18CD1"/>
+    </linearGradient>
+  </defs>
+
+  <g fill="url(#acgGrad)">
+    <polygon points="16,48 24,8 48,33" />
+    <polygon points="112,48 104,8 80,33" />
+    <polygon points="40,94 24,118 64,100" />
+    <rect x="12" y="32" width="104" height="68" rx="34" ry="34" />
+  </g>
+
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round">
+    <path d="M 36 60 Q 44 48 52 60" stroke-width="6" />
+    <path d="M 76 60 Q 84 48 92 60" stroke-width="6" />
+    <path d="M 60 70 Q 64 76 68 70" stroke-width="4" stroke-linejoin="round" />
+  </g>
+
+  <g fill="#FFFFFF" opacity="0.4">
+    <ellipse cx="32" cy="70" rx="8" ry="4" />
+    <ellipse cx="96" cy="70" rx="8" ry="4" />
+  </g>
+
+  <path d="M 104 20 Q 110 20 110 14 Q 110 20 116 20 Q 110 20 110 26 Q 110 20 104 20 Z" fill="#FFE600" />
+</svg>

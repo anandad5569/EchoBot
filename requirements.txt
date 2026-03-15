@@ -1,0 +1,27 @@
+# Core
+fastapi
+uvicorn
+pydantic
+loguru
+PyYAML
+Pillow
+
+# Memory
+agentscope
+reme-ai
+
+# Document processing
+# defusedxml
+# lxml
+# openpyxl
+# pdf2image
+# pdfplumber
+# pypdf
+
+# ASR and TTS
+edge-tts
+sherpa-onnx
+
+# Gateway
+qq-botpy
+python-telegram-bot

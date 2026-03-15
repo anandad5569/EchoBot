@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+from echobot import AgentCore, LLMMessage, LLMResponse
+from echobot.orchestration import RoleCardRegistry, RoleplayEngine
+from echobot.providers.base import LLMProvider
+from echobot.runtime.sessions import ChatSession
+
+
+_HISTORY_MARKER = "OLD_HISTORY_MARKER"
+
+
+class HistoryAwareProvider(LLMProvider):
+    async def generate(
+        self,
+        messages,
+        *,
+        tools=None,
+        tool_choice=None,
+        temperature=None,
+        max_tokens=None,
+    ) -> LLMResponse:
+        del tools, tool_choice, temperature, max_tokens
+        visible_text = "\n".join(
+            message.content_text
+            for message in messages
+            if getattr(message, "role", "") != "system"
+        )
+        content = "history-present" if _HISTORY_MARKER in visible_text else "history-missing"
+        return LLMResponse(
+            message=LLMMessage(role="assistant", content=content),
+            model="history-aware-provider",
+        )
+
+    async def stream_generate(
+        self,
+        messages,
+        *,
+        tools=None,
+        tool_choice=None,
+        temperature=None,
+        max_tokens=None,
+    ):
+        response = await self.generate(
+            messages,
+            tools=tools,
+            tool_choice=tool_choice,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        yield response.message.content
+
+
+class RoleplayEngineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stream_delegated_ack_does_not_include_history(self) -> None:
+        engine, role_card = self._build_engine()
+        session = self._session_with_history()
+        chunks: list[str] = []
+
+        async def on_chunk(chunk: str) -> None:
+            chunks.append(chunk)
+
+        result = await engine.stream_delegated_ack(
+            session=session,
+            user_input="帮我查询天气",
+            role_card=role_card,
+            on_chunk=on_chunk,
+        )
+
+        self.assertEqual("history-missing", result)
+        self.assertEqual(["history-missing"], chunks)
+
+    async def test_chat_reply_still_includes_history(self) -> None:
+        engine, role_card = self._build_engine()
+        session = self._session_with_history()
+
+        result = await engine.chat_reply(
+            session=session,
+            user_input="继续聊刚才的话题",
+            role_card=role_card,
+        )
+
+        self.assertEqual("history-present", result)
+
+    def _build_engine(self) -> tuple[RoleplayEngine, object]:
+        role_registry = RoleCardRegistry(project_root=Path.cwd())
+        engine = RoleplayEngine(
+            AgentCore(HistoryAwareProvider()),
+            role_registry,
+        )
+        role_card = role_registry.require(None)
+        return engine, role_card
+
+    def _session_with_history(self) -> ChatSession:
+        return ChatSession(
+            name="demo",
+            history=[
+                LLMMessage(role="user", content=_HISTORY_MARKER),
+                LLMMessage(role="assistant", content="之前的回复"),
+            ],
+            updated_at="",
+        )
