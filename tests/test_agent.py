@@ -189,9 +189,9 @@ class AgentCoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(3, len(result.history))
         self.assertEqual(4, len(provider.last_messages))
         self.assertEqual("system", provider.last_messages[0].role)
-        self.assertEqual("assistant", provider.last_messages[1].role)
-        self.assertEqual("system", provider.last_messages[2].role)
-        self.assertEqual("summary::summary-1", provider.last_messages[2].content)
+        self.assertEqual("system", provider.last_messages[1].role)
+        self.assertEqual("summary::summary-1", provider.last_messages[1].content)
+        self.assertEqual("assistant", provider.last_messages[2].role)
         self.assertEqual("user", provider.last_messages[3].role)
         self.assertEqual("world", memory_support.remembered_messages[0].content)
         self.assertEqual("ok", memory_support.remembered_messages[1].content)
@@ -214,7 +214,7 @@ class AgentCoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("test", memory_support.remembered_messages[0].content)
         self.assertEqual("done", memory_support.remembered_messages[-1].content)
 
-    async def test_ask_places_transient_system_messages_next_to_current_turn(self) -> None:
+    async def test_ask_places_transient_system_messages_before_history(self) -> None:
         provider = FakeProvider()
         agent = AgentCore(provider, system_prompt="You are helpful.")
         history = [LLMMessage(role="assistant", content="older")]
@@ -226,10 +226,10 @@ class AgentCoreTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(
-            ["system", "assistant", "system", "user"],
+            ["system", "system", "assistant", "user"],
             [message.role for message in provider.last_messages],
         )
-        self.assertEqual("handoff", provider.last_messages[2].content)
+        self.assertEqual("handoff", provider.last_messages[1].content)
 
     async def test_ask_with_tools_reuses_transient_system_messages_during_tool_loop(self) -> None:
         provider = FakeToolProvider()
@@ -248,15 +248,15 @@ class AgentCoreTests(unittest.IsolatedAsyncioTestCase):
         second_call = provider.seen_messages[1]
 
         self.assertEqual(
-            ["assistant", "system", "user"],
+            ["system", "assistant", "user"],
             [message.role for message in first_call],
         )
-        self.assertEqual("handoff", first_call[1].content)
+        self.assertEqual("handoff", first_call[0].content)
         self.assertEqual(
-            ["assistant", "system", "user", "assistant", "tool"],
+            ["system", "assistant", "user", "assistant", "tool"],
             [message.role for message in second_call],
         )
-        self.assertEqual("handoff", second_call[1].content)
+        self.assertEqual("handoff", second_call[0].content)
 
 
 class SystemPromptTests(unittest.TestCase):

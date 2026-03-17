@@ -351,11 +351,6 @@ class AgentCore:
         for content in self._system_message_contents(extra_system_messages):
             messages.append(LLMMessage(role="system", content=content))
 
-        history_prefix, current_turn_messages = _split_messages_for_transient_context(
-            persistent_messages
-        )
-        messages.extend(history_prefix)
-
         if self.memory_support is not None:
             summary_message = self.memory_support.build_summary_message(
                 compressed_summary,
@@ -367,6 +362,10 @@ class AgentCore:
             if content.strip():
                 messages.append(LLMMessage(role="system", content=content))
 
+        history_prefix, current_turn_messages = _split_messages_for_transient_context(
+            persistent_messages
+        )
+        messages.extend(history_prefix)
         messages.extend(current_turn_messages)
         return messages
 

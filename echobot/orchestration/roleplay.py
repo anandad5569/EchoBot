@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -9,6 +10,7 @@ from .roles import RoleCard, RoleCardRegistry
 
 
 StreamCallback = Callable[[str], Awaitable[None]]
+logger = logging.getLogger(__name__)
 
 
 ROLEPLAY_SYSTEM_PROMPT = """
@@ -316,6 +318,11 @@ class RoleplayEngine:
                 max_tokens=self._resolve_max_tokens(max_tokens),
             )
         except RuntimeError:
+            logger.exception(
+                "Roleplay generation failed for session '%s' with role '%s'",
+                session.name,
+                role_card.name,
+            )
             return fallback_text
 
         content = response.message.content_text.strip()
@@ -356,6 +363,11 @@ class RoleplayEngine:
                 chunks.append(chunk)
                 await on_chunk(chunk)
         except RuntimeError:
+            logger.exception(
+                "Roleplay streaming failed for session '%s' with role '%s'",
+                session.name,
+                role_card.name,
+            )
             partial_text = "".join(chunks).strip()
             if partial_text:
                 return partial_text

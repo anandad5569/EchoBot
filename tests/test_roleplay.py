@@ -53,6 +53,51 @@ class HistoryAwareProvider(LLMProvider):
         yield response.message.content
 
 
+class FailingProvider(LLMProvider):
+    async def generate(
+        self,
+        messages,
+        *,
+        tools=None,
+        tool_choice=None,
+        temperature=None,
+        max_tokens=None,
+    ) -> LLMResponse:
+        del messages, tools, tool_choice, temperature, max_tokens
+        raise RuntimeError("roleplay exploded")
+
+
+class EmptyAfterStreamFailureProvider(LLMProvider):
+    async def generate(
+        self,
+        messages,
+        *,
+        tools=None,
+        tool_choice=None,
+        temperature=None,
+        max_tokens=None,
+    ) -> LLMResponse:
+        del messages, tools, tool_choice, temperature, max_tokens
+        return LLMResponse(
+            message=LLMMessage(role="assistant", content=""),
+            model="empty-after-stream-failure",
+        )
+
+    async def stream_generate(
+        self,
+        messages,
+        *,
+        tools=None,
+        tool_choice=None,
+        temperature=None,
+        max_tokens=None,
+    ):
+        del messages, tools, tool_choice, temperature, max_tokens
+        if False:  # pragma: no cover
+            yield ""
+        raise RuntimeError("stream roleplay exploded")
+
+
 class RoleplayEngineTests(unittest.IsolatedAsyncioTestCase):
     async def test_stream_delegated_ack_does_not_include_history(self) -> None:
         engine, role_card = self._build_engine()
@@ -84,10 +129,49 @@ class RoleplayEngineTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual("history-present", result)
 
-    def _build_engine(self) -> tuple[RoleplayEngine, object]:
+    async def test_chat_reply_logs_failure_before_returning_fallback(self) -> None:
+        engine, role_card = self._build_engine(FailingProvider())
+        session = self._session_with_history()
+
+        with self.assertLogs("echobot.orchestration.roleplay", level="ERROR") as logs:
+            result = await engine.chat_reply(
+                session=session,
+                user_input="继续聊天",
+                role_card=role_card,
+            )
+
+        self.assertEqual("I am here.", result)
+        self.assertIn("Roleplay generation failed", logs.output[0])
+        self.assertEqual("roleplay exploded", str(logs.records[0].exc_info[1]))
+
+    async def test_stream_chat_reply_logs_failure_before_returning_fallback(self) -> None:
+        engine, role_card = self._build_engine(EmptyAfterStreamFailureProvider())
+        session = self._session_with_history()
+        chunks: list[str] = []
+
+        async def on_chunk(chunk: str) -> None:
+            chunks.append(chunk)
+
+        with self.assertLogs("echobot.orchestration.roleplay", level="ERROR") as logs:
+            result = await engine.stream_chat_reply(
+                session=session,
+                user_input="继续聊天",
+                role_card=role_card,
+                on_chunk=on_chunk,
+            )
+
+        self.assertEqual("I am here.", result)
+        self.assertEqual([], chunks)
+        self.assertIn("Roleplay streaming failed", logs.output[0])
+        self.assertEqual("stream roleplay exploded", str(logs.records[0].exc_info[1]))
+
+    def _build_engine(
+        self,
+        provider: LLMProvider | None = None,
+    ) -> tuple[RoleplayEngine, object]:
         role_registry = RoleCardRegistry(project_root=Path.cwd())
         engine = RoleplayEngine(
-            AgentCore(HistoryAwareProvider()),
+            AgentCore(provider or HistoryAwareProvider()),
             role_registry,
         )
         role_card = role_registry.require(None)

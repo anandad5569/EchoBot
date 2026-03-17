@@ -28,6 +28,7 @@ class OpenAICompatibleSettings:
     base_url: str = "https://api.openai.com/v1"
     timeout: float = 60.0
     extra_headers: dict[str, str] = field(default_factory=dict)
+    extra_body: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_env(
@@ -42,21 +43,35 @@ class OpenAICompatibleSettings:
         base_url_name = f"{prefix}BASE_URL"
         timeout_name = f"{prefix}TIMEOUT"
 
+        extra_body_name = f"{prefix}EXTRA_BODY"
+
         api_key = _get_required_env(source, api_key_name)
         model = _get_required_env(source, model_name)
         base_url = _get_optional_env(source, base_url_name, default=cls.base_url)
         timeout_text = _get_optional_env(source, timeout_name, default=str(cls.timeout))
+        extra_body_text = _get_optional_env(source, extra_body_name)
 
         try:
             timeout = float(timeout_text)
         except ValueError as exc:
             raise ValueError(f"{timeout_name} must be a number") from exc
 
+        extra_body: dict[str, Any] = {}
+        if extra_body_text is not None:
+            try:
+                parsed = json.loads(extra_body_text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{extra_body_name} must be valid JSON") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError(f"{extra_body_name} must be a JSON object")
+            extra_body = parsed
+
         return cls(
             api_key=api_key,
             model=model,
             base_url=base_url,
             timeout=timeout,
+            extra_body=extra_body,
         )
 
 
@@ -154,7 +169,7 @@ class OpenAICompatibleProvider(LLMProvider):
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.settings.model,
-            "messages": [message.to_dict() for message in messages],
+            "messages": [message.to_dict() for message in _merge_system_messages(messages)],
         }
 
         if tools:
@@ -165,6 +180,9 @@ class OpenAICompatibleProvider(LLMProvider):
             payload["temperature"] = temperature
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+
+        if self.settings.extra_body:
+            payload.update(self.settings.extra_body)
 
         return payload
 
@@ -289,6 +307,31 @@ class OpenAICompatibleProvider(LLMProvider):
         if isinstance(content, str):
             return content
         return ""
+
+
+def _merge_system_messages(messages: list[LLMMessage]) -> list[LLMMessage]:
+    """Merge consecutive leading system messages into one.
+
+    Some backends (e.g. vLLM) reject requests that contain more than one
+    system message or a system message that is not at position 0.
+    """
+    if not messages:
+        return messages
+
+    system_parts: list[str] = []
+    rest_start = 0
+    for i, msg in enumerate(messages):
+        if msg.role == "system":
+            system_parts.append(message_content_to_text(msg.content))
+            rest_start = i + 1
+        else:
+            break
+
+    if len(system_parts) <= 1:
+        return messages
+
+    merged = LLMMessage(role="system", content="\n\n".join(system_parts))
+    return [merged, *messages[rest_start:]]
 
 
 def _get_required_env(source: Mapping[str, str], name: str) -> str:
