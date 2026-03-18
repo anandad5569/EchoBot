@@ -75,6 +75,7 @@ def build_runtime_context(
     env_file_path = _resolve_runtime_path(workspace, options.env_file)
     load_env_file(str(env_file_path))
     configure_runtime_logging()
+    lightweight_max_tokens = _env_int("ECHOBOT_LIGHTWEIGHT_MAX_TOKENS", 4096)
     settings = OpenAICompatibleSettings.from_env()
     decider_provider = _build_provider_from_env(
         prefix="DECIDER_LLM_",
@@ -139,12 +140,16 @@ def build_runtime_context(
         trace_store=agent_trace_store,
     )
     role_registry = RoleCardRegistry.discover(project_root=workspace)
-    decision_engine = DecisionEngine(AgentCore(decider_provider))
+    decision_engine = DecisionEngine(
+        AgentCore(decider_provider),
+        max_tokens=lightweight_max_tokens,
+    )
     roleplay_engine = RoleplayEngine(
         AgentCore(role_provider),
         role_registry,
         default_temperature=options.temperature,
         default_max_tokens=options.max_tokens,
+        lightweight_max_tokens=lightweight_max_tokens,
     )
     coordinator = ConversationCoordinator(
         session_store=session_store,
@@ -240,6 +245,16 @@ def _heartbeat_interval_seconds(options: RuntimeOptions) -> int:
 def _heartbeat_enabled() -> bool:
     raw_value = os.environ.get("ECHOBOT_HEARTBEAT_ENABLED", "true").strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw_value = os.environ.get(name, "").strip()
+    if not raw_value:
+        return default
+    try:
+        return max(int(raw_value), 1)
+    except ValueError:
+        return default
 
 
 def _resolve_runtime_path(workspace: Path, path: str | Path) -> Path:

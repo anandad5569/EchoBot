@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 
 from ..agent import AgentCore
 from ..models import LLMMessage, message_content_to_text
 from .route_modes import DEFAULT_ROUTE_MODE, RouteMode
+
+logger = logging.getLogger(__name__)
 
 
 DECISION_SYSTEM_PROMPT = """
@@ -32,6 +35,8 @@ If the request is ambiguous, prefer "agent" when there is a meaningful chance th
 Return JSON only:
 {"route":"chat"|"agent","reason":"short reason"}
 """.strip()
+
+DEFAULT_DECISION_MAX_TOKENS = 4096
 
 
 ENGLISH_REQUEST_PREFIX = (
@@ -96,8 +101,14 @@ class RouteDecision:
 
 
 class DecisionEngine:
-    def __init__(self, decider_agent: AgentCore | None = None) -> None:
+    def __init__(
+        self,
+        decider_agent: AgentCore | None = None,
+        *,
+        max_tokens: int = DEFAULT_DECISION_MAX_TOKENS,
+    ) -> None:
         self._decider_agent = decider_agent
+        self._max_tokens = max(int(max_tokens), 1)
 
     async def decide(
         self,
@@ -123,11 +134,17 @@ class DecisionEngine:
             history=_trim_history(history, max_messages=6),
             extra_system_messages=[DECISION_SYSTEM_PROMPT],
             temperature=0,
-            max_tokens=80,
+            max_tokens=self._max_tokens,
         )
-        return _parse_decision_response(
+        decision = _parse_decision_response(
             message_content_to_text(response.message.content),
         )
+        if response.finish_reason == "length":
+            logger.warning(
+                "Decision layer hit max_tokens limit and returned route='%s' from truncated output",
+                decision.route,
+            )
+        return decision
 
 
 def _trim_history(

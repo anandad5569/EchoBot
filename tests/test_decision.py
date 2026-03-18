@@ -12,8 +12,9 @@ from echobot.providers.base import LLMProvider
 
 
 class StaticProvider(LLMProvider):
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str, *, finish_reason: str | None = None) -> None:
         self._content = content
+        self._finish_reason = finish_reason
 
     async def generate(
         self,
@@ -28,6 +29,7 @@ class StaticProvider(LLMProvider):
         return LLMResponse(
             message=LLMMessage(role="assistant", content=self._content),
             model="fake-model",
+            finish_reason=self._finish_reason,
         )
 
 
@@ -122,3 +124,19 @@ class DecisionEngineTests(unittest.IsolatedAsyncioTestCase):
         decision = await engine.decide("Can you explain shell sort?")
 
         self.assertEqual("chat", decision.route)
+
+    async def test_engine_logs_warning_when_decider_hits_max_tokens(self) -> None:
+        engine = DecisionEngine(
+            AgentCore(
+                StaticProvider(
+                    '{"route":"chat"',
+                    finish_reason="length",
+                )
+            )
+        )
+
+        with self.assertLogs("echobot.orchestration.decision", level="WARNING") as logs:
+            decision = await engine.decide("Please run that in the background")
+
+        self.assertEqual("chat", decision.route)
+        self.assertIn("Decision layer hit max_tokens limit", logs.output[0])

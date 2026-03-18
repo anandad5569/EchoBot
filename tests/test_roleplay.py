@@ -67,6 +67,27 @@ class FailingProvider(LLMProvider):
         raise RuntimeError("roleplay exploded")
 
 
+class TruncatedProvider(LLMProvider):
+    def __init__(self, content: str) -> None:
+        self._content = content
+
+    async def generate(
+        self,
+        messages,
+        *,
+        tools=None,
+        tool_choice=None,
+        temperature=None,
+        max_tokens=None,
+    ) -> LLMResponse:
+        del messages, tools, tool_choice, temperature, max_tokens
+        return LLMResponse(
+            message=LLMMessage(role="assistant", content=self._content),
+            model="truncated-provider",
+            finish_reason="length",
+        )
+
+
 class EmptyAfterStreamFailureProvider(LLMProvider):
     async def generate(
         self,
@@ -164,6 +185,23 @@ class RoleplayEngineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([], chunks)
         self.assertIn("Roleplay streaming failed", logs.output[0])
         self.assertEqual("stream roleplay exploded", str(logs.records[0].exc_info[1]))
+
+    async def test_delegated_ack_logs_warning_when_response_is_truncated(self) -> None:
+        engine, role_card = self._build_engine(TruncatedProvider(""))
+        session = self._session_with_history()
+
+        with self.assertLogs("echobot.orchestration.roleplay", level="WARNING") as logs:
+            result = await engine.delegated_ack(
+                session=session,
+                user_input="甯垜鍚姩鍚庡彴浠诲姟",
+                role_card=role_card,
+            )
+
+        self.assertEqual(
+            "I started working on that and will share the result shortly.",
+            result,
+        )
+        self.assertIn("Roleplay generation hit max_tokens limit", logs.output[0])
 
     def _build_engine(
         self,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import threading
 from collections.abc import AsyncIterator, Iterator, Mapping
@@ -19,6 +20,8 @@ from ..models import (
     normalize_message_content,
 )
 from .base import LLMProvider
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -299,6 +302,11 @@ class OpenAICompatibleProvider(LLMProvider):
             return ""
 
         choice = choices[0]
+        if choice.get("finish_reason") == "length":
+            logger.warning(
+                "LLM stream hit max_tokens limit for model '%s'",
+                self.settings.model,
+            )
         delta = choice.get("delta")
         if not isinstance(delta, dict):
             return ""

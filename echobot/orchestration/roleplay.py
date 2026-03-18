@@ -37,6 +37,8 @@ Fidelity rules:
 - Do not invent hidden work, future reminders, or successful outcomes that did not happen.
 """.strip()
 
+DEFAULT_ROLEPLAY_MAX_TOKENS = 4096
+
 _DELEGATED_ACK_INSTRUCTION = (
     "The system decided this request needs the full agent. "
     "Reply with one short sentence in character telling the user you are looking into it now. "
@@ -100,11 +102,13 @@ class RoleplayEngine:
         *,
         default_temperature: float | None = None,
         default_max_tokens: int | None = None,
+        lightweight_max_tokens: int = DEFAULT_ROLEPLAY_MAX_TOKENS,
     ) -> None:
         self._role_agent = role_agent
         self._role_registry = role_registry
         self._default_temperature = default_temperature
         self._default_max_tokens = default_max_tokens
+        self._lightweight_max_tokens = max(int(lightweight_max_tokens), 1)
 
     async def chat_reply(
         self,
@@ -164,7 +168,7 @@ class RoleplayEngine:
             ],
             fallback_text="I started working on that and will share the result shortly.",
             include_history=False,
-            max_tokens=60,
+            max_tokens=self._lightweight_max_tokens,
         )
 
     async def stream_delegated_ack(
@@ -186,7 +190,7 @@ class RoleplayEngine:
             ],
             fallback_text="I started working on that and will share the result shortly.",
             include_history=False,
-            max_tokens=60,
+            max_tokens=self._lightweight_max_tokens,
             on_chunk=on_chunk,
         )
 
@@ -287,7 +291,7 @@ class RoleplayEngine:
                 _AGENT_FAILURE_PRESENTATION_INSTRUCTION,
             ],
             fallback_text=f"The task failed: {error_text}",
-            max_tokens=120,
+            max_tokens=self._lightweight_max_tokens,
         )
 
     async def _generate(
@@ -326,6 +330,14 @@ class RoleplayEngine:
             return fallback_text
 
         content = response.message.content_text.strip()
+        if response.finish_reason == "length":
+            action = "using fallback text" if not content else "returning truncated text"
+            logger.warning(
+                "Roleplay generation hit max_tokens limit for session '%s' with role '%s'; %s",
+                session.name,
+                role_card.name,
+                action,
+            )
         return content or fallback_text
 
     async def _stream_generate(
