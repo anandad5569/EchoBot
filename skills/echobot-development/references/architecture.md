@@ -1,88 +1,97 @@
 # Architecture
 
-## Core flow
+Read this file when a change crosses module boundaries or when you need to trace a request end to end.
 
-1. A CLI entrypoint (`echobot/cli/`) or the FastAPI app (`echobot/app/`) calls `bootstrap.py`.
-2. `bootstrap.py` reads `RuntimeOptions`, loads env/config, and builds a `RuntimeContext` containing:
-   - `AgentCore` (wraps an `LLMProvider`)
-   - `SessionStore` + `ChatSession` (conversation history)
-   - `ToolRegistry` (built-in tools)
-   - `SkillRegistry` (project and user skills)
-   - `CronService` + optional `HeartbeatService`
-   - `SessionAgentRunner` (executes one conversation turn)
-3. Inbound messages arrive via a `Channel` (console, webhook, …), are routed through the `ChannelManager` and `MessageBus`, and dispatched to a session.
-4. `SessionAgentRunner.run(...)` calls `AgentCore.ask(...)` with tools and skill context injected.
-5. `AgentCore` drives the LLM + tool loop; results are returned as `AgentRunResult`.
-6. Outbound responses are put back on `MessageBus` and dispatched by the channel's outbound path.
+## Top-level entrypoints
 
-## Agent core
+- `echobot/cli/main.py` is the unified CLI. With no subcommand it falls back to `chat`.
+- `echobot/cli/chat.py`, `echobot/cli/gateway.py`, and `echobot/cli/app.py` all build the shared runtime through `echobot/runtime/bootstrap.py`.
+- `echobot/app/create_app.py` builds the FastAPI app and serves the browser UI from `echobot/app/web/`.
 
-- `echobot/agent.py`: `AgentCore` holds a provider, optional system prompt, and optional memory support. `ask(...)` drives one LLM call; `ask_with_tools(...)` runs the multi-step tool loop.
-- `echobot/models.py`: canonical data types shared across the codebase (`LLMMessage`, `LLMResponse`, `LLMTool`).
+## Shared runtime assembly
 
-## Tool system
+`build_runtime_context(...)` in `echobot/runtime/bootstrap.py` is the single assembly point. It creates:
 
-- `echobot/tools/base.py`: `BaseTool`, `ToolRegistry`, tool execution helpers.
-- `echobot/tools/builtin.py`: file access, web fetch, shell commands.
-- `echobot/tools/memory.py`, `cron.py`: memory search and cron management tools.
+- provider instances
+- `AgentCore`
+- session stores for user sessions and agent sessions
+- a `ToolRegistry` factory
+- `SkillRegistry`
+- `CronService` and optional `HeartbeatService`
+- `SessionAgentRunner`
+- `RoleCardRegistry`
+- `DecisionEngine`
+- `RoleplayEngine`
+- `ConversationCoordinator`
+- `AgentTraceStore`
 
-## Skill system
+If a feature should exist in chat, gateway, and app, wire it here once.
 
-- `echobot/skill_support/registry.py`: discovers skills from `skills/`, `.<client>/skills/`, `.agents/skills/`, `echobot/skills/`, and user-level mirrors.
-- Each skill is a folder with a required `SKILL.md` (frontmatter: `name`, `description`).
-- The runtime adds a skill catalog to the system context; explicit `/skill-name` or `$skill-name` activates immediately; otherwise the model calls `activate_skill`.
+## User turn flow
 
-## Runtime / sessions
+1. A CLI command, gateway event, or API handler resolves a session and calls the coordinator.
+2. `ConversationCoordinator.handle_user_turn_stream(...)` loads session state, role, and route mode.
+3. `DecisionEngine.decide(...)` picks `chat` or `agent`.
+4. Chat route goes straight to `RoleplayEngine.stream_chat_reply(...)`.
+5. Agent route optionally creates a short delegated acknowledgement, stores visible history, and starts a background job.
+6. The background job calls `SessionAgentRunner.run_prompt(...)`.
+7. `run_agent_turn(...)` injects base tools and skill tools into `AgentCore`.
+8. The raw agent result is wrapped back through `RoleplayEngine.present_agent_result(...)`, `present_agent_failure(...)`, or the scheduled-task presenters before it is shown to the user.
 
-- `echobot/runtime/sessions.py`: `ChatSession` (message history) and `SessionStore`.
-- `echobot/runtime/session_runner.py`: `SessionAgentRunner` — executes one turn, injecting tools and skill context.
-- `echobot/runtime/system_prompt.py`: builds the default system prompt.
-- `echobot/runtime/agent_traces.py`: `AgentTraceStore` — records per-turn traces for debugging.
-- `echobot/runtime/bootstrap.py`: `RuntimeContext` + `RuntimeOptions` — the single assembly point.
+## Separation of concerns
 
-## Orchestration
+### Decision layer
 
-- `echobot/orchestration/roles.py`: `RoleCard`, `RoleCardRegistry` — named persona definitions.
-- `echobot/orchestration/roles.py` (default): built-in cat-girl assistant persona.
-- `echobot/orchestration/route_modes.py`: routing mode selection logic.
-- `echobot/orchestration/commands.py`: session command dispatch.
-- `echobot/orchestration/role_command_runtime.py`: per-session role + command runtime.
+- `echobot/orchestration/decision.py`
+- Rule-based routing handles obvious tool, workspace, memory, and scheduling requests.
+- The lightweight decider LLM handles ambiguous turns.
+- Route modes are defined in `echobot/orchestration/route_modes.py`.
 
-## Channels
+### Roleplay layer
 
-- `echobot/channels/manager.py`: `ChannelManager` — starts/stops all channel tasks and the outbound dispatcher.
-- `echobot/channels/bus.py`: `MessageBus` — async pub/sub between channels and the session layer.
-- `echobot/channels/registry.py`: channel type registry.
-- `echobot/channels/platforms/console.py`: stdin/stdout channel (used by CLI chat).
+- `echobot/orchestration/roleplay.py`
+- Only uses visible conversation context plus explicit system instructions.
+- Must not inspect files, tools, memory, or schedules directly.
+- Presents chat replies, delegated acknowledgements, final agent results, failures, and scheduled notifications.
 
-## Gateway
+### Agent layer
 
-- `echobot/gateway/route_sessions.py`: maps incoming messages to sessions.
-- `echobot/gateway/delivery.py`: outbound message delivery.
+- `echobot/agent.py`
+- `echobot/runtime/session_runner.py`
+- `echobot/runtime/turns.py`
+- Owns tool use, skill use, file access, memory lookup, scheduling changes, and other background work.
 
-## Memory
+## Skills and tools
 
-- `echobot/memory/`: `ReMeLightSupport` wraps a lightweight retrieval-augmented memory store.
-- Enabled by default; disable with `--no-memory`.
+- `SkillRegistry.discover(...)` searches project skills first, then built-in and user roots.
+- Skill activation can happen via explicit `/skill-name` or `$skill-name`, or through the `activate_skill` tool.
+- Bundled resource files stay unloaded until the agent calls `list_skill_resources` or `read_skill_resource`.
+- Base tools come from `create_basic_tool_registry(...)` in `echobot/tools/builtin.py`.
 
-## Scheduling
+## Session and state files
 
-- `echobot/scheduling/cron/service.py`: `CronService` — stores and fires cron jobs.
-- `echobot/scheduling/heartbeat/service.py`: `HeartbeatService` — sends periodic tick events to a session.
+- Sessions: `.echobot/sessions/`
+- Agent-side session history: `.echobot/agent_sessions/`
+- Agent traces: `.echobot/agent_traces/`
+- Cron store: `.echobot/cron/jobs.json`
+- Heartbeat file: `.echobot/HEARTBEAT.md`
+- Runtime settings: `.echobot/runtime_settings.json`
 
-## ASR / TTS
+## Current module map
 
-- `echobot/asr/`: `ASRService` + `ModelManager` — speech-to-text (local models via sherpa-onnx).
-- `echobot/tts/`: `TTSService` + `TTSFactory`; providers: `edge` (Microsoft Edge TTS), `kokoro` (local Kokoro model).
+- `echobot/commands/`: user command parsing and execution for CLI and gateway flows
+- `echobot/channels/`: channel configs, message bus, manager, and platform adapters
+- `echobot/gateway/`: inbound route-to-session mapping and outbound delivery
+- `echobot/app/routers/`: HTTP endpoints for chat, sessions, roles, cron, heartbeat, channels, and web
+- `echobot/app/services/`: server-side helpers used by the API layer
+- `echobot/app/web/`: static browser UI assets
+- `echobot/memory/`: ReMeLight support
+- `echobot/asr/` and `echobot/tts/`: speech services
 
-## FastAPI app
+## Test map
 
-- `echobot/app/create_app.py`: creates the FastAPI instance and registers routers.
-- Routers: `health`, `channels`, `sessions`, `roles`, `cron`, `heartbeat`, `web`.
-- `echobot/app/runtime.py`: shares the `RuntimeContext` with the app.
-
-## Tests
-
-- `tests/test_agent.py`: provider and `AgentCore` behavior.
-- `tests/test_tools.py`: tool execution.
-- `tests/test_skill_support.py`: skill discovery and activation.
+- `tests/test_skill_support.py`: skill discovery, activation, and lazy resource loading
+- `tests/test_agent.py` and `tests/test_tools.py`: agent loop and tool execution
+- `tests/test_decision.py`, `tests/test_roleplay.py`, and `tests/test_coordinator.py`: routing and orchestration
+- `tests/test_commands.py`, `tests/test_gateway.py`, and `tests/test_app_api.py`: command and API surfaces
+- `tests/test_sessions.py`, `tests/test_scheduler.py`, and `tests/test_agent_traces.py`: persisted runtime state

@@ -1,48 +1,53 @@
 ---
 name: echobot-skill-authoring
-description: Create, revise, and validate skills for this EchoBot project. Use when the task involves SKILL.md files, skill folders, skill trigger descriptions, adding reusable instructions to this repository, or improving how the agent handles a recurring type of request.
+description: Use when creating, revising, or validating a skill in this EchoBot repository, including SKILL.md frontmatter, trigger descriptions, skill folders under skills/, bundled references or scripts or assets or agents, or changes to EchoBot skill discovery and activation behavior.
 ---
 
 # EchoBot Skill Authoring
 
-Follow the same conventions as the upstream skill-creator skill, adapted for this project.
+Create or revise repository-local skills that EchoBot can discover and activate.
 
 ## Authoring rules
 
 - Put project-specific skills under `skills/<skill-name>/`.
 - Use lowercase kebab-case for the folder name and the `name` frontmatter field.
-- `name` and `description` are the only required frontmatter fields — keep frontmatter minimal.
-- Write `description` to cover both what the skill does and all the phrases or contexts that should trigger it. This is the primary routing signal; information in the body is only loaded after activation.
-- Keep the body procedural and concise. Move large reference material to `references/` files and link to them from SKILL.md.
-- Validate every new or changed skill:
+- Keep frontmatter minimal. EchoBot routing reads `name` and `description` from `SKILL.md`.
+- Keep `name` as a single-line value. `description` may be a single line or a YAML block scalar.
+- Write `description` as the trigger surface: what the skill does, when to use it, and what kinds of user requests or contexts should activate it.
+- Keep the main body procedural and concise. Move deeper material into small files under `references/` or `scripts/`.
+- Design for lazy loading. After activation, EchoBot exposes the body plus a resource summary. It does not auto-load bundled files.
+- Only put text resources that an agent may need to read into `references/`, `scripts/`, or `agents/`. `read_skill_resource` only reads UTF-8 text files.
+- Use `assets/` for templates or binary output artifacts, not for essential instructions.
+- Do not treat `agents/openai.yaml` as required. Current EchoBot discovery ignores it.
+- Avoid extra docs like `README.md` or changelog files inside a skill unless the runtime truly needs them.
 
-```
-python echobot/skills/skill-creator/scripts/quick_validate.py skills/<skill-name>
-```
+## Resource layout
 
-## Skill structure
-
-```
+```text
 skills/<skill-name>/
-├── SKILL.md          (required)
-└── references/       (optional — load only when needed)
+|-- SKILL.md
+|-- references/   # short, focused UTF-8 docs loaded on demand
+|-- scripts/      # executable helpers or deterministic workflows
+|-- assets/       # templates or binary resources not meant for context loading
+`-- agents/       # optional helper prompts or agent-specific text resources
 ```
 
-Scripts and assets are also valid; see the upstream skill-creator skill for guidance on when to add them.
+You do not need every folder. Create only what the skill actually uses.
 
-## Runtime behavior
+## Practical workflow
 
-Skills are discovered from these folders (earlier wins on duplicate names):
+1. Draft or refine the trigger description in `SKILL.md`.
+2. Keep the main body short and procedural.
+3. Split long or variant-specific details into focused resource files.
+4. If the skill changes runtime expectations, update tests.
+5. Validate the skill with `python -X utf8 echobot/skills/skill-creator/scripts/quick_validate.py skills/<skill-name>`.
 
-1. `skills/`
-2. `.<client>/skills/`
-3. `.agents/skills/`
-4. `echobot/skills/`
-5. User-level mirrors of the above under `~/`
+## EchoBot-specific notes
 
-Activation paths:
-- Explicit user mention: `/skill-name` or `$skill-name`
-- Model-initiated: `activate_skill` tool call
-- On activation, the runtime returns the full SKILL.md body and a list of bundled resource files.
+- Project skills override built-in skills with the same `name`.
+- Explicit `/skill-name` or `$skill-name` activates the skill immediately.
+- Otherwise the model may call `activate_skill`.
+- After activation, the agent must call `list_skill_resources` and `read_skill_resource` to inspect bundled files.
+- If you change discovery, parsing, or activation behavior in `echobot/skill_support/`, run `python -m unittest tests.test_skill_support tests.test_chat_agent -v`.
 
-Read `references/runtime.md` before modifying the skill runtime or adding many new skills at once.
+Read `references/runtime.md` before changing the skill runtime or designing a skill with many bundled files.

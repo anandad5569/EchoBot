@@ -1,6 +1,11 @@
-﻿---
-description: Get current weather and forecasts on Linux and Windows (no
-  API key required).
+---
+description: >
+  Fetch current weather conditions and forecasts — no API key needed. Use
+  this skill whenever the user asks about weather, temperature, rain, wind,
+  humidity, forecast, or whether to bring an umbrella — even casual phrasing
+  like "is it cold outside?", "what's the weather like in Tokyo?", "will it
+  rain tomorrow in Seattle?", or "check the weather for me". Works on Linux,
+  macOS, and Windows without any setup.
 homepage: "https://wttr.in/:help"
 metadata:
   echo:
@@ -10,167 +15,125 @@ name: weather
 
 # Weather
 
-Cross-platform weather lookup for **Linux** and **Windows**.
+Fetch and display current weather and forecasts — no API key required.
 
-## Platform notes
+## Decision flow
 
--   **Linux / macOS / Git Bash**: use `curl`
--   **Windows PowerShell**: use `curl.exe` instead of `curl`
--   In PowerShell, bare `curl` may resolve to `Invoke-WebRequest`, which
-    can cause prompts or parsing issues
--   For JSON APIs on Windows, `Invoke-RestMethod` is often the cleanest
-    option
+1. **Identify the location** from the user's request.
+   - If the user says "here", "my location", or gives no city, ask for the city name.
+   - URL-encode spaces: `New+York`, `São+Paulo`.
+   - Airport codes work: `JFK`, `LHR`, `NRT`.
+2. **Detect the platform** (or infer from context):
+   - Linux / macOS / Git Bash → `curl`
+   - Windows PowerShell → `curl.exe` (bare `curl` maps to `Invoke-WebRequest` and may fail)
+3. **Choose the format** based on what the user wants:
+   - Quick one-liner → `format=3`
+   - More detail (humidity, wind) → custom format string
+   - Full 3-day forecast → `?T` flag
+   - Structured data / calculations → Open-Meteo JSON (see below)
 
-------------------------------------------------------------------------
+---
 
-## wttr.in (primary)
+## wttr.in — primary source
 
-Free, no API key, returns text or images.
+### One-line summary (default for most queries)
 
-### Current weather
-
-**Linux / macOS**
-
-``` bash
+```bash
+# Linux / macOS
 curl -fsSL "https://wttr.in/London?format=3"
-# Output: London: ⛅️ +8°C
-```
+# → London: ⛅️ +8°C
 
-**Windows PowerShell**
-
-``` powershell
+# Windows PowerShell
 curl.exe -s "https://wttr.in/London?format=3"
-# Output: London: ⛅️ +8°C
 ```
 
-### Compact format
+### Compact with humidity and wind
 
-**Linux / macOS**
-
-``` bash
+```bash
+# Linux / macOS
 curl -fsSL "https://wttr.in/London?format=%l:+%c+%t+%h+%w"
-# Output: London: ⛅️ +8°C 71% ↙5km/h
-```
+# → London: ⛅️ +8°C 71% ↙5km/h
 
-**Windows PowerShell**
-
-``` powershell
+# Windows PowerShell
 curl.exe -s "https://wttr.in/London?format=%l:+%c+%t+%h+%w"
-# Output: London: ⛅️ +8°C 71% ↙5km/h
 ```
 
-### Full forecast
+### Full 3-day forecast (plain text, renders as a table)
 
-**Linux / macOS**
-
-``` bash
-curl -fsSL "https://wttr.in/London?T"
+```bash
+curl -fsSL "https://wttr.in/London?T"          # Linux
+curl.exe -s  "https://wttr.in/London?T"         # Windows
 ```
 
-**Windows PowerShell**
+### Current conditions only (no forecast days)
 
-``` powershell
-curl.exe -s "https://wttr.in/London?T"
+```bash
+curl -fsSL "https://wttr.in/London?0"           # Linux
+curl.exe -s  "https://wttr.in/London?0"          # Windows
 ```
 
-### Current only
+### Units
 
-**Linux / macOS**
+Append to the URL query string:
 
-``` bash
-curl -fsSL "https://wttr.in/London?0"
-```
+| Suffix | Unit system               |
+|--------|---------------------------|
+| `?m`   | Metric (°C, km/h)         |
+| `?u`   | US customary (°F, mph)    |
+| `?M`   | Metric with m/s wind      |
+| *(none)* | Auto-detected by IP     |
 
-**Windows PowerShell**
+### Format codes (for custom `format=` strings)
 
-``` powershell
-curl.exe -s "https://wttr.in/London?0"
-```
+| Code | Meaning        |
+|------|----------------|
+| `%c` | Condition icon |
+| `%t` | Temperature    |
+| `%f` | Feels-like     |
+| `%h` | Humidity       |
+| `%w` | Wind           |
+| `%p` | Precipitation  |
+| `%P` | Pressure       |
+| `%l` | Location name  |
+| `%m` | Moon phase     |
 
-### Today only
+---
 
-**Linux / macOS**
+## Open-Meteo — fallback for structured/JSON use
 
-``` bash
-curl -fsSL "https://wttr.in/London?1"
-```
+Use when the user wants data for calculations, comparisons, or programmatic output. Requires coordinates (latitude/longitude).
 
-**Windows PowerShell**
-
-``` powershell
-curl.exe -s "https://wttr.in/London?1"
-```
-
-### Save PNG
-
-**Linux / macOS**
-
-``` bash
-curl -fsSL "https://wttr.in/Berlin.png" -o /tmp/weather.png
-```
-
-**Windows PowerShell**
-
-``` powershell
-curl.exe -s "https://wttr.in/Berlin.png" -o "$env:TEMP\weather.png"
-```
-
-### Format codes
-
--   `%c` condition\
--   `%t` temperature\
--   `%h` humidity\
--   `%w` wind\
--   `%l` location\
--   `%m` moon
-
-### Tips
-
--   URL-encode spaces: `wttr.in/New+York`
--   Airport codes: `wttr.in/JFK`
--   Units: `?m` (metric), `?u` (USCS)
--   Use full URLs (`https://`) for better cross-platform compatibility
-
-------------------------------------------------------------------------
-
-## Open-Meteo (fallback, JSON)
-
-Good for programmatic use.
-
-### Query JSON
-
-**Linux / macOS**
-
-``` bash
+```bash
+# Linux / macOS
 curl -fsSL "https://api.open-meteo.com/v1/forecast?latitude=51.5&longitude=-0.12&current_weather=true"
-```
 
-**Windows PowerShell**
-
-``` powershell
+# Windows PowerShell (cleanest for JSON)
 Invoke-RestMethod -Uri "https://api.open-meteo.com/v1/forecast?latitude=51.5&longitude=-0.12&current_weather=true"
 ```
 
-Find coordinates for a city first, then query the forecast.\
-Returns JSON with temperature, wind speed, and weather code.
+Returns JSON: `temperature`, `windspeed`, `winddirection`, `weathercode`, `time`.
 
-Docs: https://open-meteo.com/en/docs
+Add `&hourly=temperature_2m,precipitation` for hourly data, or `&daily=temperature_2m_max,precipitation_sum` for daily summaries. Docs: https://open-meteo.com/en/docs
 
-------------------------------------------------------------------------
+### WMO weather code → plain language
 
-## Recommended usage rules for agents
+| Code    | Description           |
+|---------|-----------------------|
+| 0       | Clear sky             |
+| 1–3     | Partly cloudy         |
+| 45, 48  | Fog                   |
+| 51–67   | Drizzle / Rain        |
+| 71–77   | Snow                  |
+| 80–82   | Rain showers          |
+| 85–86   | Snow showers          |
+| 95      | Thunderstorm          |
+| 96, 99  | Thunderstorm + hail   |
 
--   On **Linux**, prefer:
+---
 
-``` bash
-curl -fsSL "https://wttr.in/<CITY>?format=3"
-```
+## Presenting results to the user
 
--   On **Windows PowerShell**, prefer:
-
-``` powershell
-curl.exe -s "https://wttr.in/<CITY>?format=3"
-```
-
--   Avoid bare `curl` in PowerShell (may map to `Invoke-WebRequest`)
--   If JSON is needed on Windows, prefer `Invoke-RestMethod`
+- **Short query** ("what's the weather in Paris?"): run `format=3`, then restate in a natural sentence — *"It's currently ⛅ 12°C in Paris."*
+- **Forecast request** ("3-day forecast for Tokyo"): use the `?T` flag and display the text table directly — it's already nicely formatted.
+- **JSON / Open-Meteo**: translate `weathercode` to plain language; don't dump raw JSON at the user.
+- **Fetch failure**: if the city isn't found or the request times out, try an alternate spelling or ask the user to confirm the location.
