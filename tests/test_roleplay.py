@@ -193,7 +193,7 @@ class RoleplayEngineTests(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs("echobot.orchestration.roleplay", level="WARNING") as logs:
             result = await engine.delegated_ack(
                 session=session,
-                user_input="甯垜鍚姩鍚庡彴浠诲姟",
+                user_input="帮我启动后台任务",
                 role_card=role_card,
             )
 

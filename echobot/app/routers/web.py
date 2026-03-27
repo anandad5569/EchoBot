@@ -12,10 +12,14 @@ from ..schemas import (
     TTSVoiceModel,
     TTSVoicesResponse,
     UpdateWebASRProviderRequest,
+    UpdateWebLive2DAnnotationRequest,
+    UpdateWebLive2DHotkeyRequest,
     UpdateWebRuntimeConfigRequest,
     WebASRConfigModel,
+    WebLive2DAnnotationResponse,
     WebConfigResponse,
     WebLive2DConfigModel,
+    WebLive2DHotkeyResponse,
     WebRuntimeConfigModel,
     WebStageConfigModel,
 )
@@ -70,13 +74,18 @@ async def update_web_runtime_config(
 async def get_live2d_asset(
     asset_path: str,
     runtime=Depends(get_app_runtime),
-) -> FileResponse:
+) -> Response:
     try:
         asset_file = runtime.web_console_service.resolve_live2d_asset(asset_path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Live2D asset not found: {asset_path}") from exc
+
+    if asset_file.name.endswith(".model3.json"):
+        model_json = await runtime.web_console_service.render_live2d_model_json(asset_path)
+        return Response(content=model_json, media_type="application/json")
+
     return FileResponse(asset_file)
 
 
@@ -138,6 +147,42 @@ async def upload_live2d_directory(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return WebLive2DConfigModel(**payload)
+
+
+@router.patch("/web/live2d/annotations", response_model=WebLive2DAnnotationResponse)
+async def update_live2d_annotation(
+    request: UpdateWebLive2DAnnotationRequest,
+    runtime=Depends(get_app_runtime),
+) -> WebLive2DAnnotationResponse:
+    try:
+        payload = await runtime.web_console_service.save_live2d_annotation(
+            selection_key=request.selection_key,
+            kind=request.kind,
+            file=request.file,
+            note=request.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return WebLive2DAnnotationResponse(**payload)
+
+
+@router.patch("/web/live2d/hotkeys", response_model=WebLive2DHotkeyResponse)
+async def update_live2d_hotkey(
+    request: UpdateWebLive2DHotkeyRequest,
+    runtime=Depends(get_app_runtime),
+) -> WebLive2DHotkeyResponse:
+    try:
+        payload = await runtime.web_console_service.save_live2d_hotkey(
+            selection_key=request.selection_key,
+            hotkey_key=request.hotkey_key,
+            shortcut_tokens=request.shortcut_tokens,
+            restore_default=request.restore_default,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return WebLive2DHotkeyResponse(**payload)
 
 
 @router.get("/web/tts/voices", response_model=TTSVoicesResponse)

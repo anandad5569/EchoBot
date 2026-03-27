@@ -10,9 +10,87 @@ export function createLive2DModelController(deps) {
         writeJson,
     } = deps;
 
+    function normalizeSelectionKey(value) {
+        return String(value || "").trim();
+    }
+
+    function selectionKeyFromConfig(live2dConfig) {
+        return normalizeSelectionKey(
+            live2dConfig && (live2dConfig.selection_key || live2dConfig.model_url),
+        );
+    }
+
+    function markSelectionLoading(selectionKey) {
+        live2dState.live2dLoading = true;
+        live2dState.live2dPendingSelectionKey = normalizeSelectionKey(selectionKey);
+        suspendCurrentModelInteractions();
+    }
+
+    function finishSelectionLoad(selectionKey) {
+        const normalizedSelectionKey = normalizeSelectionKey(selectionKey);
+        live2dState.live2dLoading = false;
+        live2dState.live2dPendingSelectionKey = normalizedSelectionKey;
+        live2dState.live2dActiveSelectionKey = normalizedSelectionKey;
+    }
+
+    function restoreSelectionState() {
+        live2dState.live2dLoading = false;
+        live2dState.live2dPendingSelectionKey = live2dState.live2dActiveSelectionKey;
+        resumeCurrentModelInteractions();
+    }
+
+    function clearSelectionState() {
+        live2dState.live2dLoading = false;
+        live2dState.live2dPendingSelectionKey = "";
+        live2dState.live2dActiveSelectionKey = "";
+    }
+
+    function getSelectionRuntimeState(selectionKey) {
+        const normalizedSelectionKey = normalizeSelectionKey(selectionKey);
+        const activeSelectionKey = live2dState.live2dActiveSelectionKey;
+        const pendingSelectionKey = live2dState.live2dPendingSelectionKey;
+        const hasModel = Boolean(live2dState.live2dModel);
+        const isActiveSelection = Boolean(
+            normalizedSelectionKey
+            && normalizedSelectionKey === activeSelectionKey,
+        );
+        const isPendingSelection = Boolean(
+            normalizedSelectionKey
+            && normalizedSelectionKey === pendingSelectionKey,
+        );
+
+        return {
+            isLoading: live2dState.live2dLoading,
+            hasModel: hasModel,
+            activeSelectionKey: activeSelectionKey,
+            pendingSelectionKey: pendingSelectionKey,
+            isActiveSelection: isActiveSelection,
+            isPendingSelection: isPendingSelection,
+            canInteract: Boolean(
+                hasModel
+                && !live2dState.live2dLoading
+                && isActiveSelection,
+            ),
+        };
+    }
+
+    function resolveActionSelectionKey(selectionKey) {
+        return normalizeSelectionKey(selectionKey)
+            || selectionKeyFromConfig(appState.config && appState.config.live2d);
+    }
+
+    function assertSelectionReady(selectionKey) {
+        if (!getSelectionRuntimeState(selectionKey).canInteract) {
+            throw new Error("Live2D 模型尚未就绪。");
+        }
+    }
+
     async function loadLive2DModel(live2dConfig) {
+        const selectionKey = selectionKeyFromConfig(live2dConfig);
+        markSelectionLoading(selectionKey);
         if (!live2dConfig.available || !live2dConfig.model_url) {
             disposeCurrentLive2DModel();
+            clearSelectionState();
             setStageMessage("未找到 Live2D 模型。请检查 .echobot/live2d 目录。");
             return false;
         }
@@ -45,16 +123,42 @@ export function createLive2DModelController(deps) {
             bindLive2DDrag(model);
             attachLipSyncHook(model, live2dConfig);
             resetLive2DView();
+            finishSelectionLoad(selectionKey);
 
             setStageMessage("");
             return true;
         } catch (error) {
             console.error(error);
             if (loadToken === live2dState.live2dLoadToken) {
-                setStageMessage(`Failed to load model: ${error.message || error}`);
+                restoreSelectionState();
+                setStageMessage(`模型加载失败：${error.message || error}`);
             }
-            throw new Error(`Failed to load Live2D model: ${error.message || error}`);
+            throw new Error(`加载 Live2D 模型失败：${error.message || error}`);
         }
+    }
+
+    function suspendCurrentModelInteractions() {
+        unbindLive2DDrag();
+        unbindLive2DFocus();
+
+        if (!live2dState.live2dModel) {
+            return;
+        }
+
+        live2dState.live2dModel.interactive = false;
+        live2dState.live2dModel.cursor = "wait";
+    }
+
+    function resumeCurrentModelInteractions() {
+        const model = live2dState.live2dModel;
+        if (!model) {
+            return;
+        }
+
+        model.interactive = true;
+        model.cursor = "grab";
+        applyLive2DMouseFollowSetting();
+        bindLive2DDrag(model);
     }
 
     function bindLive2DDrag(model) {
@@ -307,6 +411,7 @@ export function createLive2DModelController(deps) {
 
         live2dState.lipSyncHook = function () {
             applyMouthValue(live2dConfig, live2dState.currentMouthValue);
+            applyActiveExpressions();
         };
         internalModel.on("beforeModelUpdate", live2dState.lipSyncHook);
         live2dState.live2dInternalModel = internalModel;
@@ -363,6 +468,7 @@ export function createLive2DModelController(deps) {
         unbindLive2DDrag();
         unbindLive2DFocus();
         detachLive2DLipSyncHook();
+        clearActiveExpressions();
 
         if (live2dState.live2dCharacterLayer) {
             live2dState.live2dCharacterLayer.removeChildren();
@@ -375,6 +481,7 @@ export function createLive2DModelController(deps) {
         }
 
         live2dState.live2dModel = null;
+        live2dState.live2dInternalModel = null;
         live2dState.dragging = false;
         live2dState.dragPointerId = null;
     }
@@ -394,7 +501,15 @@ export function createLive2DModelController(deps) {
     }
 
     function handleStageWheel(event) {
+        if (live2dState.live2dLoading) {
+            return;
+        }
+
         if (!live2dState.live2dModel) {
+            return;
+        }
+
+        if (shouldIgnoreStageWheel(event)) {
             return;
         }
 
@@ -408,6 +523,15 @@ export function createLive2DModelController(deps) {
         live2dState.live2dModel.scale.set(nextScale);
         refreshLive2DFocusFromLastPointer();
         persistLive2DTransform();
+    }
+
+    function shouldIgnoreStageWheel(event) {
+        const target = event && event.target;
+        if (!target || typeof target.closest !== "function") {
+            return false;
+        }
+
+        return Boolean(target.closest("#live2d-drawer, #live2d-drawer-backdrop"));
     }
 
     function resetLive2DView() {
@@ -430,6 +554,10 @@ export function createLive2DModelController(deps) {
     }
 
     function resetLive2DViewToDefault() {
+        if (live2dState.live2dLoading) {
+            return;
+        }
+
         const model = live2dState.live2dModel;
         if (!model || !live2dState.pixiApp) {
             return;
@@ -541,12 +669,264 @@ export function createLive2DModelController(deps) {
         }
     }
 
+    function applyActiveExpressions() {
+        const model = live2dState.live2dModel;
+        const internalModel = model && model.internalModel;
+        const coreModel = internalModel && internalModel.coreModel;
+        if (
+            !coreModel
+            || typeof coreModel.setParameterValueById !== "function"
+            || live2dState.activeExpressionMap.size === 0
+        ) {
+            return;
+        }
+
+        live2dState.activeExpressionMap.forEach((expressionDefinition) => {
+            expressionDefinition.parameters.forEach((parameter) => {
+                try {
+                    if (parameter.blend === "Add" && typeof coreModel.addParameterValueById === "function") {
+                        coreModel.addParameterValueById(parameter.id, parameter.value);
+                        return;
+                    }
+                    if (
+                        parameter.blend === "Multiply"
+                        && typeof coreModel.multiplyParameterValueById === "function"
+                    ) {
+                        coreModel.multiplyParameterValueById(parameter.id, parameter.value);
+                        return;
+                    }
+                    coreModel.setParameterValueById(parameter.id, parameter.value);
+                } catch (error) {
+                    console.warn(`Failed to apply Live2D expression parameter ${parameter.id}`, error);
+                }
+            });
+        });
+    }
+
+    async function toggleExpression(expressionItem, selectionKey = "") {
+        const normalizedSelectionKey = resolveActionSelectionKey(selectionKey);
+        const normalizedItem = normalizeExpressionItem(expressionItem);
+        if (!normalizedItem) {
+            throw new Error("无效的 Live2D 表情。");
+        }
+        assertSelectionReady(normalizedSelectionKey);
+
+        if (live2dState.activeExpressionMap.has(normalizedItem.file)) {
+            live2dState.activeExpressionMap.delete(normalizedItem.file);
+            syncActiveExpressionFiles();
+            return {
+                active: false,
+                name: normalizedItem.name,
+                file: normalizedItem.file,
+            };
+        }
+
+        const expressionDefinition = await loadExpressionDefinition(
+            normalizedItem,
+            normalizedSelectionKey,
+        );
+        assertSelectionReady(normalizedSelectionKey);
+        live2dState.activeExpressionMap.set(normalizedItem.file, expressionDefinition);
+        syncActiveExpressionFiles();
+        return {
+            active: true,
+            name: normalizedItem.name,
+            file: normalizedItem.file,
+        };
+    }
+
+    function clearActiveExpressions() {
+        live2dState.activeExpressionMap.clear();
+        syncActiveExpressionFiles();
+    }
+
+    async function playMotion(motionItem, selectionKey = "") {
+        const normalizedSelectionKey = resolveActionSelectionKey(selectionKey);
+        const model = live2dState.live2dModel;
+        const normalizedItem = normalizeMotionItem(motionItem);
+        if (!model || !normalizedItem) {
+            throw new Error("无效的 Live2D 动作。");
+        }
+        assertSelectionReady(normalizedSelectionKey);
+        if (typeof model.motion !== "function") {
+            throw new Error("当前 Live2D 运行时不支持动作播放。");
+        }
+
+        await model.motion(normalizedItem.group, normalizedItem.index);
+        return {
+            name: normalizedItem.name,
+            file: normalizedItem.file,
+        };
+    }
+
+    async function triggerHotkey(hotkeyItem, live2dConfig) {
+        const selectionKey = selectionKeyFromConfig(live2dConfig);
+        const normalizedHotkey = normalizeHotkeyItem(hotkeyItem);
+        if (!normalizedHotkey || !normalizedHotkey.supported) {
+            throw new Error("不支持的 Live2D 热键。");
+        }
+
+        if (normalizedHotkey.action === "ToggleExpression") {
+            const expressionItem = (live2dConfig && live2dConfig.expressions || []).find(
+                (item) => item.file === normalizedHotkey.file,
+            );
+            if (!expressionItem) {
+                throw new Error(`未找到表情：${normalizedHotkey.file}`);
+            }
+            const result = await toggleExpression(expressionItem, selectionKey);
+            return {
+                hotkey: normalizedHotkey,
+                result: result,
+            };
+        }
+
+        if (normalizedHotkey.action === "TriggerAnimation") {
+            const motionItem = (live2dConfig && live2dConfig.motions || []).find(
+                (item) => item.file === normalizedHotkey.file,
+            );
+            if (!motionItem) {
+                throw new Error(`未找到动作：${normalizedHotkey.file}`);
+            }
+            const result = await playMotion(motionItem, selectionKey);
+            return {
+                hotkey: normalizedHotkey,
+                result: result,
+            };
+        }
+
+        if (normalizedHotkey.action === "RemoveAllExpressions") {
+            assertSelectionReady(selectionKey);
+            clearActiveExpressions();
+            return {
+                hotkey: normalizedHotkey,
+                result: {
+                    cleared: true,
+                },
+            };
+        }
+
+        throw new Error(`不支持的 Live2D 热键动作：${normalizedHotkey.action}`);
+    }
+
+    function isExpressionActive(selectionKey, file) {
+        if (!getSelectionRuntimeState(selectionKey).canInteract) {
+            return false;
+        }
+
+        return live2dState.activeExpressionMap.has(String(file || ""));
+    }
+
+    function syncActiveExpressionFiles() {
+        live2dState.activeExpressionFiles = Array.from(live2dState.activeExpressionMap.keys());
+    }
+
+    function normalizeExpressionItem(expressionItem) {
+        if (!expressionItem || typeof expressionItem !== "object") {
+            return null;
+        }
+        const file = String(expressionItem.file || "");
+        const url = String(expressionItem.url || "");
+        if (!file || !url) {
+            return null;
+        }
+        return {
+            name: String(expressionItem.name || file),
+            file: file,
+            url: url,
+        };
+    }
+
+    function normalizeMotionItem(motionItem) {
+        if (!motionItem || typeof motionItem !== "object") {
+            return null;
+        }
+        const file = String(motionItem.file || "");
+        const group = String(motionItem.group || "");
+        const index = Number.isInteger(motionItem.index) ? motionItem.index : 0;
+        if (!file || !group) {
+            return null;
+        }
+        return {
+            name: String(motionItem.name || file),
+            file: file,
+            group: group,
+            index: index,
+        };
+    }
+
+    function normalizeHotkeyItem(hotkeyItem) {
+        if (!hotkeyItem || typeof hotkeyItem !== "object") {
+            return null;
+        }
+        return {
+            hotkey_id: String(hotkeyItem.hotkey_id || ""),
+            name: String(hotkeyItem.name || hotkeyItem.action || "Hotkey"),
+            action: String(hotkeyItem.action || ""),
+            file: String(hotkeyItem.file || ""),
+            supported: Boolean(hotkeyItem.supported),
+        };
+    }
+
+    async function loadExpressionDefinition(expressionItem, selectionKey) {
+        assertSelectionReady(selectionKey);
+
+        const cacheKey = `${normalizeSelectionKey(selectionKey)}::${expressionItem.url}`;
+        if (live2dState.expressionDataCache.has(cacheKey)) {
+            return live2dState.expressionDataCache.get(cacheKey);
+        }
+
+        const response = await fetch(expressionItem.url, {
+            cache: "no-store",
+        });
+        if (!response.ok) {
+            throw new Error(`加载表情失败：${expressionItem.name}`);
+        }
+
+        const payload = await response.json();
+        assertSelectionReady(selectionKey);
+        const parameters = Array.isArray(payload && payload.Parameters)
+            ? payload.Parameters
+                .filter((item) => item && typeof item === "object")
+                .map((item) => ({
+                    id: String(item.Id || ""),
+                    value: typeof item.Value === "number" ? item.Value : 0,
+                    blend: normalizeExpressionBlend(item.Blend),
+                }))
+                .filter((item) => item.id)
+            : [];
+
+        const expressionDefinition = {
+            name: expressionItem.name,
+            file: expressionItem.file,
+            parameters: parameters,
+        };
+        live2dState.expressionDataCache.set(cacheKey, expressionDefinition);
+        return expressionDefinition;
+    }
+
+    function normalizeExpressionBlend(blend) {
+        const normalizedBlend = String(blend || "").trim().toLowerCase();
+        if (normalizedBlend === "add") {
+            return "Add";
+        }
+        if (normalizedBlend === "multiply") {
+            return "Multiply";
+        }
+        return "Set";
+    }
+
     return {
         applyLive2DMouseFollowSetting,
         applyMouthValue,
+        clearActiveExpressions,
+        getSelectionRuntimeState,
         handleStageWheel,
         loadLive2DModel,
+        isExpressionActive,
+        playMotion,
         refreshLive2DFocusFromLastPointer,
         resetLive2DViewToDefault,
+        toggleExpression,
+        triggerHotkey,
     };
 }

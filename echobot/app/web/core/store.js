@@ -42,6 +42,8 @@ export const roleState = {
 };
 
 export const panelState = {
+    live2dDrawerOpen: false,
+    live2dDrawerTab: "expression",
     roleSidebarOpen: false,
     sessionSidebarOpen: false,
     cronPollTimerId: 0,
@@ -105,6 +107,9 @@ export const live2dState = {
     live2dDragHandlers: null,
     live2dFocusHandlers: null,
     live2dLoadToken: 0,
+    live2dLoading: false,
+    live2dPendingSelectionKey: "",
+    live2dActiveSelectionKey: "",
     live2dLastPointerX: null,
     live2dLastPointerY: null,
     stageBackgroundSprite: null,
@@ -122,10 +127,14 @@ export const live2dState = {
     currentMouthValue: 0,
     lipSyncFrameId: 0,
     lipSyncHook: null,
+    expressionDataCache: new Map(),
+    activeExpressionMap: new Map(),
+    activeExpressionFiles: [],
     dragging: false,
     dragPointerId: null,
     dragOffsetX: 0,
     dragOffsetY: 0,
+    live2dHotkeysEnabled: false,
     live2dMouseFollowEnabled: true,
     selectedStageBackgroundKey: "default",
     currentStageBackgroundTransform: null,

@@ -46,6 +46,7 @@ const layout = createLayoutModule({
 });
 const live2d = createLive2DModule({
     clamp,
+    requestJson,
     roundTo,
     responseToError,
     setRunStatus: status.setRunStatus,
@@ -142,6 +143,7 @@ document.addEventListener("DOMContentLoaded", initializePage);
 
 async function initializePage() {
     layout.ensureSidebarToggleButtons();
+    layout.initializeLive2DDrawer();
     initializeMessageInteractions();
     wireAppEvents({
         asr,
@@ -171,7 +173,10 @@ async function initializePage() {
         const activeLive2DConfig = live2d.applyConfigToUI(config);
 
         live2d.initializePixiApplication();
-        await live2d.loadLive2DModel(activeLive2DConfig);
+        const live2dLoadPromise = live2d.loadLive2DModel(activeLive2DConfig);
+        live2d.renderLive2DControls(activeLive2DConfig);
+        await live2dLoadPromise;
+        live2d.renderLive2DControls(appState.config.live2d);
         layout.restoreSessionSidebarState();
         layout.restoreRoleSidebarState();
         await sessions.initializeSessionPanel(config.session_name);

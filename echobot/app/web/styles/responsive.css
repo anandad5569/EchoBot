@@ -24,6 +24,10 @@
         min-height: 360px;
     }
 
+    .live2d-drawer {
+        width: min(360px, calc(100% - 28px));
+    }
+
     .stage-background-transform-grid {
         grid-template-columns: 1fr;
     }
@@ -48,6 +52,20 @@
     .panel-section,
     .composer {
         padding: 18px;
+    }
+
+    .live2d-drawer {
+        top: auto;
+        right: 10px;
+        bottom: 10px;
+        left: 10px;
+        width: auto;
+        max-height: min(72%, 520px);
+        transform: translateY(calc(100% + 24px));
+    }
+
+    .live2d-drawer[aria-hidden="false"] {
+        transform: translateY(0);
     }
 
     .field-grid {

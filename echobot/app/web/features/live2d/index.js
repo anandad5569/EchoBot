@@ -2,6 +2,7 @@ import { DOM } from "../../core/dom.js";
 import { readJson, removeStoredValue, writeJson } from "../../core/storage.js";
 import { createStageBackgroundController } from "./backgrounds.js";
 import { createLive2DConfigController } from "./config.js";
+import { createLive2DControlsController } from "./controls.js";
 import { createStageEffectsController } from "./effects.js";
 import { createLive2DModelController } from "./model.js";
 import { createLive2DSceneController } from "./scene.js";
@@ -9,6 +10,7 @@ import { createLive2DSceneController } from "./scene.js";
 export function createLive2DModule(deps) {
     const {
         clamp,
+        requestJson,
         roundTo,
         responseToError,
         setRunStatus,
@@ -57,6 +59,26 @@ export function createLive2DModule(deps) {
         writeJson,
     });
 
+    const controlsController = createLive2DControlsController({
+        getSelectionRuntimeState(...args) {
+            return modelController.getSelectionRuntimeState(...args);
+        },
+        isExpressionActive(...args) {
+            return modelController.isExpressionActive(...args);
+        },
+        playMotion(...args) {
+            return modelController.playMotion(...args);
+        },
+        requestJson,
+        setRunStatus,
+        toggleExpression(...args) {
+            return modelController.toggleExpression(...args);
+        },
+        triggerHotkey(...args) {
+            return modelController.triggerHotkey(...args);
+        },
+    });
+
     sceneController = createLive2DSceneController({
         clamp,
         roundTo,
@@ -99,6 +121,12 @@ export function createLive2DModule(deps) {
         loadSavedStageEffectsSettings(...args) {
             return effectsController.loadSavedStageEffectsSettings(...args);
         },
+        resetLive2DHotkeyState(...args) {
+            return controlsController.resetHotkeyState(...args);
+        },
+        renderLive2DControls(...args) {
+            return controlsController.renderLive2DControls(...args);
+        },
         renderStageBackgroundOptions(...args) {
             backgroundController.renderStageBackgroundOptions(...args);
         },
@@ -113,6 +141,11 @@ export function createLive2DModule(deps) {
         applyMouthValue: modelController.applyMouthValue,
         handleLive2DDirectoryUpload: configController.handleLive2DDirectoryUpload,
         handleLive2DModelChange: configController.handleLive2DModelChange,
+        handleLive2DControlsClick: controlsController.handleControlsClick,
+        handleLive2DHotkeyKeyDown: controlsController.handleWindowKeyDown,
+        handleLive2DHotkeyKeyUp: controlsController.handleWindowKeyUp,
+        handleLive2DHotkeyWindowBlur: controlsController.handleWindowBlur,
+        handleHotkeysToggle: configController.handleHotkeysToggle,
         handleMouseFollowToggle: configController.handleMouseFollowToggle,
         handleStageBackgroundChange: backgroundController.handleStageBackgroundChange,
         handleStageBackgroundReset: backgroundController.handleStageBackgroundReset,
@@ -124,6 +157,7 @@ export function createLive2DModule(deps) {
         handleStageWheel: modelController.handleStageWheel,
         initializePixiApplication: sceneController.initializePixiApplication,
         loadLive2DModel: modelController.loadLive2DModel,
+        renderLive2DControls: controlsController.renderLive2DControls,
         resetLive2DViewToDefault: modelController.resetLive2DViewToDefault,
         setStageMessage,
     };

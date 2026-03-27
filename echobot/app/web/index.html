@@ -17,6 +17,15 @@
                     <span id="session-label" class="muted-text">会话: default</span>
                 </div>
                 <div class="stage-actions">
+                    <button
+                        id="live2d-drawer-toggle"
+                        class="ghost-button ghost-button-compact"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="live2d-drawer"
+                    >
+                        Live2D 模型选项
+                    </button>
                     <button id="reset-view-button" class="ghost-button" type="button">重置模型</button>
                     <button id="stop-audio-button" class="ghost-button" type="button">停止语音</button>
                     <button id="stop-agent-button" class="ghost-button stop-agent-button" type="button" disabled>停止任务</button>
@@ -35,6 +44,99 @@
                     <span>滚轮缩放</span>
                 </div>
                 <div id="stage-message" class="stage-message">正在加载 Live2D 模型…</div>
+                <button
+                    id="live2d-drawer-backdrop"
+                    class="live2d-drawer-backdrop"
+                    type="button"
+                    hidden
+                    aria-label="关闭 Live2D 模型选项"
+                ></button>
+                <section id="live2d-drawer" class="live2d-drawer" aria-hidden="true">
+                    <div class="live2d-drawer-header">
+                        <div class="live2d-drawer-header-main">
+                            <p class="section-title">Live2D 模型选项</p>
+                            <span id="live2d-drawer-summary" class="muted-text">
+                                表情、动作和热键
+                            </span>
+                        </div>
+                        <button
+                            id="live2d-drawer-close"
+                            class="ghost-button ghost-button-compact"
+                            type="button"
+                        >
+                            隐藏
+                        </button>
+                    </div>
+                    <div class="live2d-drawer-tabs" role="tablist" aria-label="Live2D 模型选项">
+                        <button
+                            id="live2d-tab-expression"
+                            class="live2d-drawer-tab is-active"
+                            type="button"
+                            role="tab"
+                            aria-selected="true"
+                            aria-controls="live2d-expression-panel"
+                            data-live2d-drawer-tab="expression"
+                        >
+                            表情
+                        </button>
+                        <button
+                            id="live2d-tab-motion"
+                            class="live2d-drawer-tab"
+                            type="button"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="live2d-motion-panel"
+                            data-live2d-drawer-tab="motion"
+                        >
+                            动作
+                        </button>
+                        <button
+                            id="live2d-tab-hotkey"
+                            class="live2d-drawer-tab"
+                            type="button"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="live2d-hotkey-panel"
+                            data-live2d-drawer-tab="hotkey"
+                        >
+                            热键
+                        </button>
+                    </div>
+                    <div class="live2d-drawer-body">
+                        <section
+                            id="live2d-expression-panel"
+                            class="live2d-drawer-panel"
+                            role="tabpanel"
+                            aria-labelledby="live2d-tab-expression"
+                        >
+                            <div id="live2d-expression-list" class="live2d-control-list"></div>
+                        </section>
+                        <section
+                            id="live2d-motion-panel"
+                            class="live2d-drawer-panel"
+                            role="tabpanel"
+                            aria-labelledby="live2d-tab-motion"
+                            hidden
+                        >
+                            <div id="live2d-motion-list" class="live2d-control-list"></div>
+                        </section>
+                        <section
+                            id="live2d-hotkey-panel"
+                            class="live2d-drawer-panel"
+                            role="tabpanel"
+                            aria-labelledby="live2d-tab-hotkey"
+                            hidden
+                        >
+                            <div class="toggle-row">
+                                <label class="toggle-item">
+                                    <input id="live2d-hotkeys-checkbox" type="checkbox">
+                                    <span>启用模型热键</span>
+                                </label>
+                            </div>
+                            <div id="live2d-hotkey-list" class="live2d-control-list"></div>
+                        </section>
+                    </div>
+                </section>
             </div>
         </section>
 

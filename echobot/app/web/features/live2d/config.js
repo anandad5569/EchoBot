@@ -2,10 +2,7 @@ import { DOM } from "../../core/dom.js";
 import {
     DEFAULT_LIP_SYNC_IDS,
     appState,
-    audioState,
     live2dState,
-    roleState,
-    sessionState,
 } from "../../core/store.js";
 import {
     readBoolean,
@@ -14,6 +11,7 @@ import {
     writeString,
 } from "../../core/storage.js";
 import {
+    LIVE2D_HOTKEYS_STORAGE_KEY,
     LIVE2D_MOUSE_FOLLOW_STORAGE_KEY,
     LIVE2D_SELECTION_STORAGE_KEY,
 } from "./constants.js";
@@ -29,6 +27,8 @@ export function createLive2DConfigController(deps) {
         buildStageConfig,
         loadLive2DModel,
         loadSavedStageEffectsSettings,
+        resetLive2DHotkeyState,
+        renderLive2DControls,
         renderStageBackgroundOptions,
         resolveInitialStageBackgroundKey,
     } = deps;
@@ -42,26 +42,23 @@ export function createLive2DConfigController(deps) {
         const stageConfig = buildStageConfig(config.stage);
         const stageBackgroundKey = resolveInitialStageBackgroundKey(stageConfig);
 
-        sessionState.currentSessionName = rememberedSessionName;
-        roleState.currentRoleName = config.role_name || "default";
-        sessionState.currentRouteMode = config.route_mode || "auto";
-        audioState.ttsEnabled = DOM.autoTtsCheckbox ? DOM.autoTtsCheckbox.checked : true;
+        live2dState.live2dHotkeysEnabled = loadSavedLive2DHotkeysEnabled();
         live2dState.live2dMouseFollowEnabled = loadSavedLive2DMouseFollowEnabled();
         appState.config.live2d = currentLive2DConfig;
         appState.config.stage = stageConfig;
         live2dState.selectedStageBackgroundKey = stageBackgroundKey;
         live2dState.stageEffects = loadSavedStageEffectsSettings();
 
+        if (DOM.live2dHotkeysCheckbox) {
+            DOM.live2dHotkeysCheckbox.checked = live2dState.live2dHotkeysEnabled;
+        }
         if (DOM.live2dMouseFollowCheckbox) {
             DOM.live2dMouseFollowCheckbox.checked = live2dState.live2dMouseFollowEnabled;
         }
 
-        if (DOM.routeModeSelect) {
-            DOM.routeModeSelect.value = sessionState.currentRouteMode;
-        }
-
         DOM.sessionLabel.textContent = `会话: ${rememberedSessionName}`;
         renderLive2DModelOptions(live2dModelOptions, currentLive2DConfig.selection_key);
+        renderLive2DControls(currentLive2DConfig);
         renderStageBackgroundOptions(stageConfig, stageBackgroundKey);
         applyStageBackgroundByKey(stageConfig, stageBackgroundKey);
         applyStageEffectsSettings(live2dState.stageEffects, { persist: false });
@@ -109,7 +106,61 @@ export function createLive2DConfigController(deps) {
             mouth_form_parameter_id: typeof (modelOption && modelOption.mouth_form_parameter_id) === "string"
                 ? modelOption.mouth_form_parameter_id
                 : null,
+            expressions: normalizeLive2DExpressions(modelOption && modelOption.expressions),
+            motions: normalizeLive2DMotions(modelOption && modelOption.motions),
+            hotkeys: normalizeLive2DHotkeys(modelOption && modelOption.hotkeys),
+            annotations_writable: Boolean(modelOption && modelOption.annotations_writable),
         };
+    }
+
+    function normalizeLive2DExpressions(items) {
+        return Array.isArray(items)
+            ? items
+                .filter((item) => item && typeof item === "object")
+                .map((item) => ({
+                    name: String(item.name || item.file || ""),
+                    file: String(item.file || ""),
+                    url: String(item.url || ""),
+                    note: String(item.note || ""),
+                }))
+                .filter((item) => item.file && item.url)
+            : [];
+    }
+
+    function normalizeLive2DMotions(items) {
+        return Array.isArray(items)
+            ? items
+                .filter((item) => item && typeof item === "object")
+                .map((item) => ({
+                    name: String(item.name || item.file || ""),
+                    file: String(item.file || ""),
+                    url: String(item.url || ""),
+                    note: String(item.note || ""),
+                    group: String(item.group || ""),
+                    index: Number.isInteger(item.index) ? item.index : 0,
+                }))
+                .filter((item) => item.file && item.url && item.group)
+            : [];
+    }
+
+    function normalizeLive2DHotkeys(items) {
+        return Array.isArray(items)
+            ? items
+                .filter((item) => item && typeof item === "object")
+                .map((item) => ({
+                    hotkey_key: String(item.hotkey_key || item.hotkey_id || ""),
+                    hotkey_id: String(item.hotkey_id || ""),
+                    name: String(item.name || item.action || "热键"),
+                    action: String(item.action || ""),
+                    file: String(item.file || ""),
+                    shortcut_tokens: Array.isArray(item.shortcut_tokens)
+                        ? item.shortcut_tokens.filter((token) => typeof token === "string")
+                        : [],
+                    shortcut_label: String(item.shortcut_label || ""),
+                    target_kind: String(item.target_kind || ""),
+                    supported: Boolean(item.supported),
+                }))
+            : [];
     }
 
     function resolveInitialLive2DConfig(live2dConfig, modelOptions) {
@@ -117,10 +168,12 @@ export function createLive2DConfigController(deps) {
             || findLive2DModelOption(modelOptions, live2dConfig && live2dConfig.selection_key)
             || modelOptions[0]
             || null;
-        return buildCurrentLive2DConfig(selectedOption, modelOptions);
+        return buildCurrentLive2DConfig(selectedOption, modelOptions, {
+            persistSelection: true,
+        });
     }
 
-    function buildCurrentLive2DConfig(selectedOption, modelOptions) {
+    function buildCurrentLive2DConfig(selectedOption, modelOptions, options = {}) {
         if (!selectedOption) {
             return {
                 available: false,
@@ -131,13 +184,19 @@ export function createLive2DConfigController(deps) {
                 directory_name: "",
                 lip_sync_parameter_ids: DEFAULT_LIP_SYNC_IDS.slice(),
                 mouth_form_parameter_id: null,
+                expressions: [],
+                motions: [],
+                hotkeys: [],
+                annotations_writable: false,
                 models: [],
             };
         }
 
         const normalizedOption = normalizeLive2DModelOption(selectedOption);
         const normalizedOptions = modelOptions.map(normalizeLive2DModelOption);
-        persistLive2DSelectionKey(normalizedOption.selection_key);
+        if (options.persistSelection) {
+            persistLive2DSelectionKey(normalizedOption.selection_key);
+        }
         return {
             available: true,
             source: normalizedOption.source,
@@ -147,6 +206,10 @@ export function createLive2DConfigController(deps) {
             directory_name: normalizedOption.directory_name,
             lip_sync_parameter_ids: normalizedOption.lip_sync_parameter_ids,
             mouth_form_parameter_id: normalizedOption.mouth_form_parameter_id,
+            expressions: normalizedOption.expressions,
+            motions: normalizedOption.motions,
+            hotkeys: normalizedOption.hotkeys,
+            annotations_writable: normalizedOption.annotations_writable,
             models: normalizedOptions,
         };
     }
@@ -188,20 +251,24 @@ export function createLive2DConfigController(deps) {
 
     function updateLive2DUploadControls(options = {}) {
         const isUploading = Boolean(options.isUploading);
+        const isLoading = options.isLoading === undefined
+            ? live2dState.live2dLoading
+            : Boolean(options.isLoading);
+        const isBusy = isUploading || isLoading;
         const modelOptions = resolveLive2DModelOptions(appState.config && appState.config.live2d);
 
         if (DOM.modelSelect) {
-            if (isUploading || modelOptions.length === 0) {
+            if (isBusy || modelOptions.length === 0) {
                 DOM.modelSelect.disabled = true;
             } else {
                 DOM.modelSelect.disabled = modelOptions.length <= 1;
             }
         }
         if (DOM.live2dUploadButton) {
-            DOM.live2dUploadButton.disabled = isUploading;
+            DOM.live2dUploadButton.disabled = isBusy;
         }
         if (DOM.live2dUploadInput) {
-            DOM.live2dUploadInput.disabled = isUploading;
+            DOM.live2dUploadInput.disabled = isBusy;
         }
     }
 
@@ -260,26 +327,31 @@ export function createLive2DConfigController(deps) {
                 || null;
 
             if (!uploadedOption) {
-                throw new Error("No Live2D model was found after upload.");
+                throw new Error("上传完成后没有发现可用的 Live2D 模型。");
             }
 
             const nextLive2DConfig = buildCurrentLive2DConfig(uploadedOption, nextModelOptions);
             appState.config.live2d = nextLive2DConfig;
+            const loadPromise = loadLive2DModel(nextLive2DConfig);
             renderLive2DModelOptions(nextModelOptions, nextLive2DConfig.selection_key);
+            updateLive2DUploadControls({ isUploading: true, isLoading: true });
+            renderLive2DControls(nextLive2DConfig);
 
-            const didLoadModel = await loadLive2DModel(nextLive2DConfig);
+            const didLoadModel = await loadPromise;
+            renderLive2DControls(appState.config.live2d);
             if (
                 !didLoadModel
                 || appState.config.live2d.selection_key !== nextLive2DConfig.selection_key
             ) {
                 return;
             }
-
+            persistLive2DSelectionKey(nextLive2DConfig.selection_key);
             setRunStatus(`已上传 Live2D 模型：${buildLive2DModelLabel(uploadedOption)}`);
         } catch (error) {
             console.error(error);
             appState.config.live2d = previousLive2DConfig;
             renderLive2DModelOptions(previousModelOptions, previousLive2DConfig.selection_key);
+            renderLive2DControls(previousLive2DConfig);
             persistLive2DSelectionKey(previousLive2DConfig.selection_key);
             setRunStatus(error.message || "Live2D 文件夹上传失败");
         } finally {
@@ -289,6 +361,13 @@ export function createLive2DConfigController(deps) {
 
     async function handleLive2DModelChange(selectionKey) {
         if (!appState.config) {
+            return;
+        }
+        if (live2dState.live2dLoading) {
+            renderLive2DModelOptions(
+                resolveLive2DModelOptions(appState.config.live2d),
+                appState.config.live2d.selection_key,
+            );
             return;
         }
 
@@ -306,17 +385,23 @@ export function createLive2DConfigController(deps) {
         const previousLive2DConfig = appState.config.live2d;
         const nextLive2DConfig = buildCurrentLive2DConfig(nextModelOption, modelOptions);
         appState.config.live2d = nextLive2DConfig;
+        const loadPromise = loadLive2DModel(nextLive2DConfig);
         renderLive2DModelOptions(modelOptions, nextLive2DConfig.selection_key);
+        updateLive2DUploadControls({ isLoading: true });
+        renderLive2DControls(nextLive2DConfig);
         setRunStatus(`切换模型中：${buildLive2DModelLabel(nextModelOption)}`);
 
         try {
-            const didLoadModel = await loadLive2DModel(nextLive2DConfig);
+            const didLoadModel = await loadPromise;
+            renderLive2DControls(appState.config.live2d);
+            updateLive2DUploadControls();
             if (
                 !didLoadModel
                 || appState.config.live2d.selection_key !== nextLive2DConfig.selection_key
             ) {
                 return;
             }
+            persistLive2DSelectionKey(nextLive2DConfig.selection_key);
             setRunStatus(`已切换模型：${buildLive2DModelLabel(nextModelOption)}`);
         } catch (error) {
             console.error(error);
@@ -325,15 +410,10 @@ export function createLive2DConfigController(deps) {
             }
             appState.config.live2d = previousLive2DConfig;
             renderLive2DModelOptions(modelOptions, previousLive2DConfig.selection_key);
+            renderLive2DControls(previousLive2DConfig);
             persistLive2DSelectionKey(previousLive2DConfig.selection_key);
+            updateLive2DUploadControls();
 
-            if (previousLive2DConfig.available && previousLive2DConfig.model_url) {
-                try {
-                    await loadLive2DModel(previousLive2DConfig);
-                } catch (restoreError) {
-                    console.error("Failed to restore previous Live2D model", restoreError);
-                }
-            }
 
             setRunStatus(error.message || "Live2D 模型加载失败");
         }
@@ -345,6 +425,14 @@ export function createLive2DConfigController(deps) {
 
     function persistLive2DSelectionKey(selectionKey) {
         writeString(LIVE2D_SELECTION_STORAGE_KEY, String(selectionKey || ""));
+    }
+
+    function loadSavedLive2DHotkeysEnabled() {
+        return readBoolean(LIVE2D_HOTKEYS_STORAGE_KEY, false);
+    }
+
+    function persistLive2DHotkeysEnabled(enabled) {
+        writeBoolean(LIVE2D_HOTKEYS_STORAGE_KEY, Boolean(enabled));
     }
 
     function loadSavedLive2DMouseFollowEnabled() {
@@ -370,10 +458,26 @@ export function createLive2DConfigController(deps) {
         );
     }
 
+    function handleHotkeysToggle() {
+        if (!DOM.live2dHotkeysCheckbox) {
+            return;
+        }
+
+        live2dState.live2dHotkeysEnabled = DOM.live2dHotkeysCheckbox.checked;
+        persistLive2DHotkeysEnabled(live2dState.live2dHotkeysEnabled);
+        resetLive2DHotkeyState();
+        setRunStatus(
+            live2dState.live2dHotkeysEnabled
+                ? "已启用 Live2D 模型热键"
+                : "已关闭 Live2D 模型热键",
+        );
+    }
+
     return {
         applyConfigToUI,
         handleLive2DDirectoryUpload,
         handleLive2DModelChange,
+        handleHotkeysToggle,
         handleMouseFollowToggle,
     };
 }

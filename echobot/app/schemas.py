@@ -266,6 +266,55 @@ class UpdateWebASRProviderRequest(BaseModel):
     provider: str = ""
 
 
+class WebLive2DExpressionModel(BaseModel):
+    name: str = ""
+    file: str = ""
+    url: str = ""
+    note: str = ""
+
+
+class WebLive2DMotionModel(WebLive2DExpressionModel):
+    group: str = ""
+    index: int = 0
+
+
+class WebLive2DHotkeyModel(BaseModel):
+    hotkey_key: str = ""
+    hotkey_id: str = ""
+    name: str = ""
+    action: str = ""
+    file: str = ""
+    shortcut_tokens: list[str] = Field(default_factory=list)
+    shortcut_label: str = ""
+    target_kind: str = ""
+    supported: bool = False
+
+
+class UpdateWebLive2DAnnotationRequest(BaseModel):
+    selection_key: str = ""
+    kind: str = ""
+    file: str = ""
+    note: str = ""
+
+
+class WebLive2DAnnotationResponse(BaseModel):
+    selection_key: str = ""
+    kind: str = ""
+    file: str = ""
+    note: str = ""
+
+
+class UpdateWebLive2DHotkeyRequest(BaseModel):
+    selection_key: str = ""
+    hotkey_key: str = ""
+    shortcut_tokens: list[str] = Field(default_factory=list)
+    restore_default: bool = False
+
+
+class WebLive2DHotkeyResponse(WebLive2DHotkeyModel):
+    selection_key: str = ""
+
+
 class WebLive2DModelOptionModel(BaseModel):
     source: str = ""
     selection_key: str = ""
@@ -274,6 +323,10 @@ class WebLive2DModelOptionModel(BaseModel):
     directory_name: str = ""
     lip_sync_parameter_ids: list[str] = Field(default_factory=list)
     mouth_form_parameter_id: str | None = None
+    expressions: list[WebLive2DExpressionModel] = Field(default_factory=list)
+    motions: list[WebLive2DMotionModel] = Field(default_factory=list)
+    hotkeys: list[WebLive2DHotkeyModel] = Field(default_factory=list)
+    annotations_writable: bool = False
 
 
 class WebLive2DConfigModel(WebLive2DModelOptionModel):

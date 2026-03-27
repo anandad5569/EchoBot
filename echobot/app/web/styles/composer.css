@@ -265,6 +265,10 @@
     transform: translateY(-1px);
 }
 
+.live2d-hotkey-clear:hover {
+    transform: translateY(-50%);
+}
+
 .primary-button:disabled,
 .ghost-button:disabled {
     opacity: 0.6;

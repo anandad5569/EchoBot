@@ -55,7 +55,11 @@ export function wireAppEvents(features) {
         asr.updateVoiceInputControls();
     });
 
+    bindOptionalChange(DOM.live2dHotkeysCheckbox, live2d.handleHotkeysToggle);
     bindOptionalChange(DOM.live2dMouseFollowCheckbox, live2d.handleMouseFollowToggle);
+    bindOptionalClickHandler(DOM.live2dExpressionList, live2d.handleLive2DControlsClick);
+    bindOptionalClickHandler(DOM.live2dMotionList, live2d.handleLive2DControlsClick);
+    bindOptionalClickHandler(DOM.live2dHotkeyList, live2d.handleLive2DControlsClick);
     DOM.voiceSelect.addEventListener("change", tts.handleVoiceSelectionChange);
     bindOptionalAsyncChange(DOM.ttsProviderSelect, tts.handleTtsProviderChange);
     bindOptionalAsyncChange(DOM.asrProviderSelect, asr.handleAsrProviderChange);
@@ -63,6 +67,14 @@ export function wireAppEvents(features) {
     bindOptionalClick(DOM.live2dUploadButton, () => DOM.live2dUploadInput?.click());
     bindOptionalInputChange(DOM.live2dUploadInput, live2d.handleLive2DDirectoryUpload);
     bindOptionalToggle(DOM.live2dPanel, layout.handleLive2DPanelToggle);
+    bindOptionalClick(DOM.live2dDrawerToggle, () => {
+        layout.setLive2DDrawerOpen(!panelState.live2dDrawerOpen);
+    });
+    bindOptionalClick(DOM.live2dDrawerClose, () => layout.setLive2DDrawerOpen(false));
+    bindOptionalClick(DOM.live2dDrawerBackdrop, () => layout.setLive2DDrawerOpen(false));
+    bindOptionalClick(DOM.live2dTabExpression, () => layout.setLive2DDrawerTab("expression"));
+    bindOptionalClick(DOM.live2dTabMotion, () => layout.setLive2DDrawerTab("motion"));
+    bindOptionalClick(DOM.live2dTabHotkey, () => layout.setLive2DDrawerTab("hotkey"));
 
     bindOptionalAsyncChange(DOM.stageBackgroundSelect, () => {
         live2d.handleStageBackgroundChange(DOM.stageBackgroundSelect.value);
@@ -167,6 +179,13 @@ export function wireAppEvents(features) {
     }
 
     DOM.stageElement.addEventListener("wheel", live2d.handleStageWheel, { passive: false });
+    window.addEventListener("keydown", (event) => {
+        live2d.handleLive2DHotkeyKeyDown(event);
+    });
+    window.addEventListener("keyup", (event) => {
+        live2d.handleLive2DHotkeyKeyUp(event);
+    });
+    window.addEventListener("blur", live2d.handleLive2DHotkeyWindowBlur);
 
     document.body.addEventListener("pointerdown", () => {
         void tts.ensureAudioContextReady();

@@ -188,6 +188,104 @@
     display: none;
 }
 
+.live2d-drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 18;
+    border: none;
+    padding: 0;
+    background: rgba(45, 34, 25, 0.18);
+}
+
+.live2d-drawer {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    bottom: 18px;
+    z-index: 19;
+    width: min(380px, calc(100% - 36px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid rgba(87, 57, 34, 0.12);
+    border-radius: 24px;
+    background: rgba(255, 248, 239, 0.97);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 24px 44px rgba(70, 37, 18, 0.16);
+    transform: translateX(calc(100% + 24px));
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.24s ease, opacity 0.24s ease;
+}
+
+.live2d-drawer[aria-hidden="false"] {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.live2d-drawer-header,
+.live2d-drawer-header-main,
+.live2d-drawer-tabs {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.live2d-drawer-header {
+    justify-content: space-between;
+}
+
+.live2d-drawer-header-main {
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.live2d-drawer-body {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.live2d-drawer-panel {
+    min-height: 100%;
+}
+
+.live2d-drawer-panel .live2d-control-list {
+    margin-top: 0;
+}
+
+.live2d-drawer-tabs {
+    flex-wrap: wrap;
+}
+
+.live2d-drawer-tab {
+    border: 1px solid rgba(87, 57, 34, 0.14);
+    border-radius: 999px;
+    padding: 8px 14px;
+    background: rgba(255, 252, 247, 0.82);
+    color: var(--muted);
+    font-weight: 700;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.live2d-drawer-tab.is-active {
+    border-color: rgba(202, 92, 54, 0.26);
+    background: rgba(202, 92, 54, 0.12);
+    color: var(--accent-strong);
+    box-shadow: 0 0 0 4px rgba(202, 92, 54, 0.08);
+}
+
 @keyframes stage-grain-shift {
     0% {
         background-position: 0 0, 0 0;

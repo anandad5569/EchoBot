@@ -576,6 +576,252 @@ def write_test_hiyori_live2d_model(workspace: Path) -> None:
     (texture_dir / "texture_00.png").write_bytes(b"fake-png")
 
 
+def write_test_vtube_live2d_model(workspace: Path) -> None:
+    model_dir = workspace / ".echobot" / "live2d" / "yumi"
+    texture_dir = model_dir / "textures"
+    texture_dir.mkdir(parents=True, exist_ok=True)
+
+    model_payload = {
+        "Version": 3,
+        "FileReferences": {
+            "Moc": "yumi.moc3",
+            "Textures": [
+                "textures/texture_00.png",
+            ],
+            "DisplayInfo": "yumi.cdi3.json",
+        },
+        "Groups": [
+            {
+                "Target": "Parameter",
+                "Name": "LipSync",
+                "Ids": ["ParamMouthOpenY"],
+            },
+        ],
+    }
+    display_info_payload = {
+        "Version": 3,
+        "Parameters": [
+            {"Id": "ParamMouthOpenY", "Name": "Mouth Open"},
+            {"Id": "ParamMouthForm", "Name": "Mouth Form"},
+            {"Id": "ParamEyeSmile", "Name": "Smile"},
+        ],
+    }
+    vtube_payload = {
+        "FileReferences": {
+            "Model": "yumi.model3.json",
+            "IdleAnimation": "wave.motion3.json",
+        },
+        "Hotkeys": [
+            {
+                "HotkeyID": "hk_exp_smile",
+                "Name": "Smile",
+                "Action": "ToggleExpression",
+                "File": "smile.exp3.json",
+                "Triggers": {
+                    "Trigger1": "Alt",
+                    "Trigger2": "N1",
+                    "Trigger3": "",
+                    "ScreenButton": -1,
+                },
+            },
+            {
+                "HotkeyID": "hk_motion_wave",
+                "Name": "Wave",
+                "Action": "TriggerAnimation",
+                "File": "wave.motion3.json",
+                "Triggers": {
+                    "Trigger1": "LeftControl",
+                    "Trigger2": "F3",
+                    "Trigger3": "",
+                    "ScreenButton": -1,
+                },
+            },
+            {
+                "HotkeyID": "hk_clear",
+                "Name": "Clear Expressions",
+                "Action": "RemoveAllExpressions",
+                "File": "",
+                "Triggers": {
+                    "Trigger1": "LeftControl",
+                    "Trigger2": "Tab",
+                    "Trigger3": "Space",
+                    "ScreenButton": -1,
+                },
+            },
+        ],
+    }
+    smile_expression_payload = {
+        "Type": "Live2D Expression",
+        "Parameters": [
+            {"Id": "ParamEyeSmile", "Value": 1.0, "Blend": "Add"},
+        ],
+    }
+    sad_expression_payload = {
+        "Type": "Live2D Expression",
+        "Parameters": [
+            {"Id": "ParamMouthForm", "Value": -1.0, "Blend": "Set"},
+        ],
+    }
+    motion_payload = {
+        "Version": 3,
+        "Meta": {
+            "Duration": 1.0,
+            "Loop": False,
+            "AreBeziersRestricted": True,
+            "CurveCount": 0,
+            "TotalSegmentCount": 0,
+            "TotalPointCount": 0,
+            "UserDataCount": 0,
+            "TotalUserDataSize": 0,
+            "Fps": 30,
+        },
+        "Curves": [],
+        "UserData": [],
+    }
+    annotations_payload = {
+        "version": 1,
+        "expressions": {
+            "smile.exp3.json": "默认笑脸",
+        },
+        "motions": {},
+        "hotkeys": {},
+    }
+
+    (model_dir / "yumi.model3.json").write_text(
+        json.dumps(model_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "yumi.cdi3.json").write_text(
+        json.dumps(display_info_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "yumi.vtube.json").write_text(
+        json.dumps(vtube_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "smile.exp3.json").write_text(
+        json.dumps(smile_expression_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "sad.exp3.json").write_text(
+        json.dumps(sad_expression_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "wave.motion3.json").write_text(
+        json.dumps(motion_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "jump.motion3.json").write_text(
+        json.dumps(motion_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    (model_dir / "echobot.live2d.json").write_text(
+        json.dumps(annotations_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (model_dir / "yumi.moc3").write_bytes(b"fake-yumi-moc3")
+    (texture_dir / "texture_00.png").write_bytes(b"fake-png")
+
+
+def write_test_split_runtime_live2d_models(workspace: Path) -> None:
+    base_dir = workspace / ".echobot" / "live2d" / "duo"
+    runtime_specs = [
+        {
+            "runtime_name": "alpha",
+            "model_name": "alpha",
+            "parameter_id": "ParamAlphaSmile",
+            "default_note": "alpha default note",
+            "function_key": "F1",
+        },
+        {
+            "runtime_name": "beta",
+            "model_name": "beta",
+            "parameter_id": "ParamBetaSmile",
+            "default_note": "beta default note",
+            "function_key": "F2",
+        },
+    ]
+
+    for runtime_spec in runtime_specs:
+        runtime_dir = base_dir / runtime_spec["runtime_name"]
+        texture_dir = runtime_dir / "textures"
+        texture_dir.mkdir(parents=True, exist_ok=True)
+
+        model_payload = {
+            "Version": 3,
+            "FileReferences": {
+                "Moc": f"{runtime_spec['model_name']}.moc3",
+                "Textures": [
+                    "textures/texture_00.png",
+                ],
+                "DisplayInfo": f"{runtime_spec['model_name']}.cdi3.json",
+            },
+        }
+        display_info_payload = {
+            "Version": 3,
+            "Parameters": [
+                {"Id": "ParamMouthOpenY", "Name": "Mouth Open"},
+                {"Id": runtime_spec["parameter_id"], "Name": "Smile"},
+            ],
+        }
+        vtube_payload = {
+            "FileReferences": {
+                "Model": f"{runtime_spec['model_name']}.model3.json",
+            },
+            "Hotkeys": [
+                {
+                    "HotkeyID": "hk_smile",
+                    "Name": "Smile",
+                    "Action": "ToggleExpression",
+                    "File": "smile.exp3.json",
+                    "Triggers": {
+                        "Trigger1": "LeftControl",
+                        "Trigger2": runtime_spec["function_key"],
+                        "Trigger3": "",
+                        "ScreenButton": -1,
+                    },
+                },
+            ],
+        }
+        expression_payload = {
+            "Type": "Live2D Expression",
+            "Parameters": [
+                {"Id": runtime_spec["parameter_id"], "Value": 1.0, "Blend": "Add"},
+            ],
+        }
+        annotations_payload = {
+            "version": 1,
+            "expressions": {
+                "smile.exp3.json": runtime_spec["default_note"],
+            },
+            "motions": {},
+            "hotkeys": {},
+        }
+
+        (runtime_dir / f"{runtime_spec['model_name']}.model3.json").write_text(
+            json.dumps(model_payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (runtime_dir / f"{runtime_spec['model_name']}.cdi3.json").write_text(
+            json.dumps(display_info_payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (runtime_dir / f"{runtime_spec['model_name']}.vtube.json").write_text(
+            json.dumps(vtube_payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (runtime_dir / "smile.exp3.json").write_text(
+            json.dumps(expression_payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        (runtime_dir / "echobot.live2d.json").write_text(
+            json.dumps(annotations_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (runtime_dir / f"{runtime_spec['model_name']}.moc3").write_bytes(b"fake-moc3")
+        (texture_dir / "texture_00.png").write_bytes(b"fake-png")
+
+
 def write_test_cron_jobs(workspace: Path) -> None:
     cron_store_path = workspace / ".echobot" / "cron" / "jobs.json"
     cron_store_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1904,6 +2150,9 @@ class AppApiTests(unittest.TestCase):
                 self.assertIn('id="agent-trace-panel"', page.text)
                 self.assertIn('id="agent-trace-events"', page.text)
                 self.assertIn('id="live2d-panel"', page.text)
+                self.assertIn('id="live2d-drawer"', page.text)
+                self.assertIn('id="live2d-drawer-toggle"', page.text)
+                self.assertIn('id="live2d-hotkeys-checkbox"', page.text)
                 self.assertIn('id="live2d-upload-button"', page.text)
                 self.assertIn('id="live2d-upload-input"', page.text)
                 self.assertIn('id="stage-background-select"', page.text)
@@ -2273,6 +2522,444 @@ class AppApiTests(unittest.TestCase):
                         for item in config.json()["live2d"]["models"]
                     )
                 )
+
+    def test_web_console_discovers_live2d_controls_from_vtube_json_and_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_test_vtube_live2d_model(workspace)
+
+            app = create_app(
+                runtime_options=RuntimeOptions(
+                    workspace=workspace,
+                    no_tools=True,
+                    no_skills=True,
+                    no_memory=True,
+                    no_heartbeat=True,
+                ),
+                channel_config_path=workspace / ".echobot" / "channels.json",
+                context_builder=build_test_context,
+                tts_service_builder=build_test_tts_service,
+                asr_service_builder=build_test_asr_service,
+            )
+
+            with TestClient(app) as client:
+                config = client.get("/api/web/config")
+
+            self.assertEqual(200, config.status_code)
+            payload = config.json()["live2d"]
+            self.assertEqual("workspace", payload["source"])
+            self.assertEqual("yumi", payload["directory_name"])
+            self.assertTrue(payload["annotations_writable"])
+            self.assertEqual(
+                ["smile.exp3.json", "sad.exp3.json"],
+                [item["file"] for item in payload["expressions"]],
+            )
+            self.assertEqual(
+                "默认笑脸",
+                next(item["note"] for item in payload["expressions"] if item["file"] == "smile.exp3.json"),
+            )
+            self.assertEqual(
+                ["wave.motion3.json", "jump.motion3.json"],
+                [item["file"] for item in payload["motions"]],
+            )
+            self.assertEqual(
+                ["hk_exp_smile", "hk_motion_wave", "hk_clear"],
+                [item["hotkey_id"] for item in payload["hotkeys"]],
+            )
+            self.assertEqual(
+                ["alt", "digit1"],
+                payload["hotkeys"][0]["shortcut_tokens"],
+            )
+            self.assertEqual("Ctrl + F3", payload["hotkeys"][1]["shortcut_label"])
+            self.assertTrue(payload["hotkeys"][2]["supported"])
+
+    def test_web_console_patches_model3_json_with_discovered_live2d_controls(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_test_vtube_live2d_model(workspace)
+
+            app = create_app(
+                runtime_options=RuntimeOptions(
+                    workspace=workspace,
+                    no_tools=True,
+                    no_skills=True,
+                    no_memory=True,
+                    no_heartbeat=True,
+                ),
+                channel_config_path=workspace / ".echobot" / "channels.json",
+                context_builder=build_test_context,
+                tts_service_builder=build_test_tts_service,
+                asr_service_builder=build_test_asr_service,
+            )
+
+            with TestClient(app) as client:
+                config = client.get("/api/web/config")
+                model_response = client.get(config.json()["live2d"]["model_url"])
+
+            self.assertEqual(200, config.status_code)
+            self.assertEqual(200, model_response.status_code)
+            patched_model = model_response.json()
+            self.assertEqual(
+                ["smile.exp3.json", "sad.exp3.json"],
+                [item["File"] for item in patched_model["FileReferences"]["Expressions"]],
+            )
+            self.assertIn("EchoBotIdle", patched_model["FileReferences"]["Motions"])
+            self.assertIn("EchoBotAuto", patched_model["FileReferences"]["Motions"])
+            self.assertEqual(
+                "wave.motion3.json",
+                patched_model["FileReferences"]["Motions"]["EchoBotIdle"][0]["File"],
+            )
+            self.assertEqual(
+                "jump.motion3.json",
+                patched_model["FileReferences"]["Motions"]["EchoBotAuto"][0]["File"],
+            )
+
+    def test_web_console_can_save_live2d_annotations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_test_vtube_live2d_model(workspace)
+
+            app = create_app(
+                runtime_options=RuntimeOptions(
+                    workspace=workspace,
+                    no_tools=True,
+                    no_skills=True,
+                    no_memory=True,
+                    no_heartbeat=True,
+                ),
+                channel_config_path=workspace / ".echobot" / "channels.json",
+                context_builder=build_test_context,
+                tts_service_builder=build_test_tts_service,
+                asr_service_builder=build_test_asr_service,
+            )
+
+            with TestClient(app) as client:
+                config = client.get("/api/web/config")
+                selection_key = config.json()["live2d"]["selection_key"]
+                expression_saved = client.patch(
+                    "/api/web/live2d/annotations",
+                    json={
+                        "selection_key": selection_key,
+                        "kind": "expression",
+                        "file": "sad.exp3.json",
+                        "note": "悲伤播报",
+                    },
+                )
+                motion_saved = client.patch(
+                    "/api/web/live2d/annotations",
+                    json={
+                        "selection_key": selection_key,
+                        "kind": "motion",
+                        "file": "jump.motion3.json",
+                        "note": "高兴时播放",
+                    },
+                )
+                refreshed = client.get("/api/web/config")
+
+            self.assertEqual(200, expression_saved.status_code)
+            self.assertEqual(200, motion_saved.status_code)
+            annotations_path = (
+                workspace
+                / ".echobot"
+                / "live2d"
+                / "yumi"
+                / "echobot.live2d.json"
+            )
+            annotations_payload = json.loads(annotations_path.read_text(encoding="utf-8"))
+            self.assertEqual("悲伤播报", annotations_payload["expressions"]["sad.exp3.json"])
+            self.assertEqual("高兴时播放", annotations_payload["motions"]["jump.motion3.json"])
+            self.assertEqual(
+                "悲伤播报",
+                next(
+                    item["note"]
+                    for item in refreshed.json()["live2d"]["expressions"]
+                    if item["file"] == "sad.exp3.json"
+                ),
+            )
+            self.assertEqual(
+                "高兴时播放",
+                next(
+                    item["note"]
+                    for item in refreshed.json()["live2d"]["motions"]
+                    if item["file"] == "jump.motion3.json"
+                ),
+            )
+
+    def test_web_console_can_save_live2d_hotkeys(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_test_vtube_live2d_model(workspace)
+
+            app = create_app(
+                runtime_options=RuntimeOptions(
+                    workspace=workspace,
+                    no_tools=True,
+                    no_skills=True,
+                    no_memory=True,
+                    no_heartbeat=True,
+                ),
+                channel_config_path=workspace / ".echobot" / "channels.json",
+                context_builder=build_test_context,
+                tts_service_builder=build_test_tts_service,
+                asr_service_builder=build_test_asr_service,
+            )
+
+            with TestClient(app) as client:
+                config = client.get("/api/web/config")
+                selection_key = config.json()["live2d"]["selection_key"]
+                hotkey_saved = client.patch(
+                    "/api/web/live2d/hotkeys",
+                    json={
+                        "selection_key": selection_key,
+                        "hotkey_key": "hk_motion_wave",
+                        "shortcut_tokens": ["Shift", "N2"],
+                    },
+                )
+                hotkey_cleared = client.patch(
+                    "/api/web/live2d/hotkeys",
+                    json={
+                        "selection_key": selection_key,
+                        "hotkey_key": "hk_clear",
+                        "shortcut_tokens": [],
+                    },
+                )
+                refreshed = client.get("/api/web/config")
+
+            self.assertEqual(200, hotkey_saved.status_code)
+            self.assertEqual(
+                ["shift", "digit2"],
+                hotkey_saved.json()["shortcut_tokens"],
+            )
+            self.assertEqual("Shift + 2", hotkey_saved.json()["shortcut_label"])
+            self.assertEqual(200, hotkey_cleared.status_code)
+            self.assertEqual([], hotkey_cleared.json()["shortcut_tokens"])
+            self.assertEqual("Unassigned", hotkey_cleared.json()["shortcut_label"])
+
+            annotations_path = (
+                workspace
+                / ".echobot"
+                / "live2d"
+                / "yumi"
+                / "echobot.live2d.json"
+            )
+            annotations_payload = json.loads(annotations_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                ["shift", "digit2"],
+                annotations_payload["hotkeys"]["hk_motion_wave"]["shortcut_tokens"],
+            )
+            self.assertEqual(
+                [],
+                annotations_payload["hotkeys"]["hk_clear"]["shortcut_tokens"],
+            )
+            refreshed_hotkeys = {
+                item["hotkey_key"]: item
+                for item in refreshed.json()["live2d"]["hotkeys"]
+            }
+            self.assertEqual(
+                ["shift", "digit2"],
+                refreshed_hotkeys["hk_motion_wave"]["shortcut_tokens"],
+            )
+            self.assertEqual(
+                "Shift + 2",
+                refreshed_hotkeys["hk_motion_wave"]["shortcut_label"],
+            )
+            self.assertEqual(
+                [],
+                refreshed_hotkeys["hk_clear"]["shortcut_tokens"],
+            )
+
+    def test_web_console_can_restore_live2d_hotkey_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_test_vtube_live2d_model(workspace)
+
+            app = create_app(
+                runtime_options=RuntimeOptions(
+                    workspace=workspace,
+                    no_tools=True,
+                    no_skills=True,
+                    no_memory=True,
+                    no_heartbeat=True,
+                ),
+                channel_config_path=workspace / ".echobot" / "channels.json",
+                context_builder=build_test_context,
+                tts_service_builder=build_test_tts_service,
+                asr_service_builder=build_test_asr_service,
+            )
+
+            with TestClient(app) as client:
+                config = client.get("/api/web/config")
+                selection_key = config.json()["live2d"]["selection_key"]
+                saved = client.patch(
+                    "/api/web/live2d/hotkeys",
+                    json={
+                        "selection_key": selection_key,
+                        "hotkey_key": "hk_motion_wave",
+                        "shortcut_tokens": ["Shift", "N2"],
+                    },
+                )
+                restored = client.patch(
+                    "/api/web/live2d/hotkeys",
+                    json={
+                        "selection_key": selection_key,
+                        "hotkey_key": "hk_motion_wave",
+                        "restore_default": True,
+                    },
+                )
+                refreshed = client.get("/api/web/config")
+
+            self.assertEqual(200, saved.status_code)
+            self.assertEqual(200, restored.status_code)
+            self.assertEqual(
+                ["control", "f3"],
+                restored.json()["shortcut_tokens"],
+            )
+            self.assertEqual("Ctrl + F3", restored.json()["shortcut_label"])
+
+            annotations_path = (
+                workspace
+                / ".echobot"
+                / "live2d"
+                / "yumi"
+                / "echobot.live2d.json"
+            )
+            annotations_payload = json.loads(annotations_path.read_text(encoding="utf-8"))
+            self.assertNotIn("hk_motion_wave", annotations_payload["hotkeys"])
+
+            refreshed_hotkeys = {
+                item["hotkey_key"]: item
+                for item in refreshed.json()["live2d"]["hotkeys"]
+            }
+            self.assertEqual(
+                ["control", "f3"],
+                refreshed_hotkeys["hk_motion_wave"]["shortcut_tokens"],
+            )
+            self.assertEqual(
+                "Ctrl + F3",
+                refreshed_hotkeys["hk_motion_wave"]["shortcut_label"],
+            )
+
+    def test_web_console_isolates_live2d_annotations_per_runtime_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workspace = Path(temp_dir)
+            write_test_split_runtime_live2d_models(workspace)
+
+            app = create_app(
+                runtime_options=RuntimeOptions(
+                    workspace=workspace,
+                    no_tools=True,
+                    no_skills=True,
+                    no_memory=True,
+                    no_heartbeat=True,
+                ),
+                channel_config_path=workspace / ".echobot" / "channels.json",
+                context_builder=build_test_context,
+                tts_service_builder=build_test_tts_service,
+                asr_service_builder=build_test_asr_service,
+            )
+
+            with TestClient(app) as client:
+                config = client.get("/api/web/config")
+                workspace_models = [
+                    item
+                    for item in config.json()["live2d"]["models"]
+                    if item["source"] == "workspace"
+                ]
+                alpha_model = next(
+                    item
+                    for item in workspace_models
+                    if item["model_name"] == "alpha"
+                )
+                beta_model = next(
+                    item
+                    for item in workspace_models
+                    if item["model_name"] == "beta"
+                )
+
+                alpha_saved = client.patch(
+                    "/api/web/live2d/annotations",
+                    json={
+                        "selection_key": alpha_model["selection_key"],
+                        "kind": "expression",
+                        "file": "smile.exp3.json",
+                        "note": "alpha custom note",
+                    },
+                )
+                beta_hotkey_saved = client.patch(
+                    "/api/web/live2d/hotkeys",
+                    json={
+                        "selection_key": beta_model["selection_key"],
+                        "hotkey_key": "hk_smile",
+                        "shortcut_tokens": ["Alt", "Digit9"],
+                    },
+                )
+                refreshed = client.get("/api/web/config")
+
+            self.assertEqual(200, alpha_saved.status_code)
+            self.assertEqual(200, beta_hotkey_saved.status_code)
+
+            alpha_annotations_path = (
+                workspace
+                / ".echobot"
+                / "live2d"
+                / "duo"
+                / "alpha"
+                / "echobot.live2d.json"
+            )
+            beta_annotations_path = (
+                workspace
+                / ".echobot"
+                / "live2d"
+                / "duo"
+                / "beta"
+                / "echobot.live2d.json"
+            )
+            alpha_annotations = json.loads(alpha_annotations_path.read_text(encoding="utf-8"))
+            beta_annotations = json.loads(beta_annotations_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(
+                "alpha custom note",
+                alpha_annotations["expressions"]["smile.exp3.json"],
+            )
+            self.assertEqual(
+                "beta default note",
+                beta_annotations["expressions"]["smile.exp3.json"],
+            )
+            self.assertNotIn("hk_smile", alpha_annotations["hotkeys"])
+            self.assertEqual(
+                ["alt", "digit9"],
+                beta_annotations["hotkeys"]["hk_smile"]["shortcut_tokens"],
+            )
+
+            refreshed_models = {
+                item["model_name"]: item
+                for item in refreshed.json()["live2d"]["models"]
+                if item["source"] == "workspace"
+            }
+            self.assertEqual(
+                "alpha custom note",
+                next(
+                    item["note"]
+                    for item in refreshed_models["alpha"]["expressions"]
+                    if item["file"] == "smile.exp3.json"
+                ),
+            )
+            self.assertEqual(
+                "beta default note",
+                next(
+                    item["note"]
+                    for item in refreshed_models["beta"]["expressions"]
+                    if item["file"] == "smile.exp3.json"
+                ),
+            )
+            self.assertEqual(
+                ["alt", "digit9"],
+                next(
+                    item["shortcut_tokens"]
+                    for item in refreshed_models["beta"]["hotkeys"]
+                    if item["hotkey_key"] == "hk_smile"
+                ),
+            )
 
     def test_web_console_prefers_configured_live2d_model_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

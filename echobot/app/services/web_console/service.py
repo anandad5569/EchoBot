@@ -105,12 +105,45 @@ class WebConsoleService:
     def resolve_live2d_asset(self, asset_path: str) -> Path:
         return self._live2d_service.resolve_asset(asset_path)
 
+    async def render_live2d_model_json(self, asset_path: str) -> str:
+        return await self._live2d_service.render_model_json(asset_path)
+
     async def save_live2d_directory(
         self,
         *,
         uploaded_files: list[Live2DUploadFile],
     ) -> dict[str, Any]:
         return await self._live2d_service.save_directory(uploaded_files)
+
+    async def save_live2d_annotation(
+        self,
+        *,
+        selection_key: str,
+        kind: str,
+        file: str,
+        note: str,
+    ) -> dict[str, Any]:
+        return await self._live2d_service.save_annotation(
+            selection_key=selection_key,
+            kind=kind,
+            file=file,
+            note=note,
+        )
+
+    async def save_live2d_hotkey(
+        self,
+        *,
+        selection_key: str,
+        hotkey_key: str,
+        shortcut_tokens: list[str],
+        restore_default: bool = False,
+    ) -> dict[str, Any]:
+        return await self._live2d_service.save_hotkey(
+            selection_key=selection_key,
+            hotkey_key=hotkey_key,
+            shortcut_tokens=shortcut_tokens,
+            restore_default=restore_default,
+        )
 
     def resolve_stage_background_asset(self, asset_path: str) -> Path:
         return self._stage_background_service.resolve_asset(asset_path)

@@ -4,6 +4,7 @@ import { readBoolean, writeBoolean } from "../../core/storage.js";
 
 const SESSION_SIDEBAR_STORAGE_KEY = "echobot.web.session_sidebar_open";
 const ROLE_SIDEBAR_STORAGE_KEY = "echobot.web.role_sidebar_open";
+const LIVE2D_DRAWER_TABS = ["expression", "motion", "hotkey"];
 
 export function createSidebarController() {
     function ensureSidebarToggleButtons() {
@@ -48,6 +49,11 @@ export function createSidebarController() {
 
     function restoreRoleSidebarState() {
         setRoleSidebarOpen(readBoolean(ROLE_SIDEBAR_STORAGE_KEY, false));
+    }
+
+    function initializeLive2DDrawer() {
+        setLive2DDrawerTab(panelState.live2dDrawerTab, { openDrawer: false });
+        setLive2DDrawerOpen(false);
     }
 
     function setSessionSidebarOpen(isOpen, options = {}) {
@@ -108,10 +114,53 @@ export function createSidebarController() {
         writeBoolean(ROLE_SIDEBAR_STORAGE_KEY, panelState.roleSidebarOpen);
     }
 
+    function setLive2DDrawerOpen(isOpen) {
+        panelState.live2dDrawerOpen = Boolean(isOpen);
+
+        if (DOM.live2dDrawer) {
+            DOM.live2dDrawer.setAttribute("aria-hidden", String(!panelState.live2dDrawerOpen));
+        }
+        if (DOM.live2dDrawerBackdrop) {
+            DOM.live2dDrawerBackdrop.hidden = !panelState.live2dDrawerOpen;
+        }
+        if (DOM.live2dDrawerToggle) {
+            DOM.live2dDrawerToggle.setAttribute("aria-expanded", String(panelState.live2dDrawerOpen));
+        }
+    }
+
+    function setLive2DDrawerTab(tabKey, options = {}) {
+        const normalizedTab = LIVE2D_DRAWER_TABS.includes(tabKey) ? tabKey : "expression";
+        panelState.live2dDrawerTab = normalizedTab;
+
+        const tabEntries = [
+            ["expression", DOM.live2dExpressionPanel, DOM.live2dTabExpression],
+            ["motion", DOM.live2dMotionPanel, DOM.live2dTabMotion],
+            ["hotkey", DOM.live2dHotkeyPanel, DOM.live2dTabHotkey],
+        ];
+        tabEntries.forEach(([entryKey, panel, button]) => {
+            const isActive = entryKey === panelState.live2dDrawerTab;
+            if (panel) {
+                panel.hidden = !isActive;
+            }
+            if (button) {
+                button.classList.toggle("is-active", isActive);
+                button.setAttribute("aria-selected", String(isActive));
+                button.tabIndex = isActive ? 0 : -1;
+            }
+        });
+
+        if (options.openDrawer !== false) {
+            setLive2DDrawerOpen(true);
+        }
+    }
+
     return {
         ensureSidebarToggleButtons,
+        initializeLive2DDrawer,
         restoreRoleSidebarState,
         restoreSessionSidebarState,
+        setLive2DDrawerOpen,
+        setLive2DDrawerTab,
         setRoleSidebarOpen,
         setSessionSidebarOpen,
         stopSummaryButtonToggle,

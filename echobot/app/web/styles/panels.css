@@ -474,6 +474,279 @@
     background: rgba(255, 251, 246, 0.82);
 }
 
+.live2d-control-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.live2d-control-section {
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(87, 57, 34, 0.12);
+    background: rgba(255, 251, 246, 0.78);
+}
+
+.live2d-control-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.live2d-control-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.live2d-control-empty,
+.live2d-control-card {
+    border-radius: 16px;
+    border: 1px solid rgba(87, 57, 34, 0.12);
+    background: rgba(255, 253, 249, 0.95);
+}
+
+.live2d-control-empty {
+    margin: 0;
+    padding: 14px 16px;
+    color: var(--muted);
+}
+
+.live2d-control-card {
+    padding: 14px 16px;
+    box-shadow: 0 8px 18px rgba(70, 37, 18, 0.05);
+}
+
+.live2d-control-card-head,
+.live2d-control-shortcuts {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.live2d-control-card-head {
+    justify-content: space-between;
+}
+
+.live2d-control-card-title {
+    margin: 0;
+    font-size: 0.96rem;
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.live2d-control-card-meta,
+.live2d-control-card-note-label {
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 0.84rem;
+    word-break: break-word;
+}
+
+.live2d-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.live2d-switch-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.live2d-switch-track {
+    position: relative;
+    width: 54px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(87, 57, 34, 0.14);
+    background: rgba(87, 57, 34, 0.12);
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.live2d-switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(255, 253, 249, 0.98);
+    box-shadow: 0 6px 14px rgba(70, 37, 18, 0.16);
+    transition: transform 0.2s ease;
+}
+
+.live2d-switch:hover .live2d-switch-track {
+    border-color: rgba(202, 92, 54, 0.3);
+}
+
+.live2d-switch-input:checked + .live2d-switch-track {
+    border-color: rgba(143, 52, 25, 0.4);
+    background: linear-gradient(135deg, rgba(202, 92, 54, 0.92), rgba(143, 52, 25, 0.92));
+}
+
+.live2d-switch-input:checked + .live2d-switch-track::after {
+    transform: translateX(22px);
+}
+
+.live2d-switch-input:focus-visible + .live2d-switch-track {
+    box-shadow: 0 0 0 4px rgba(202, 92, 54, 0.14);
+}
+
+.live2d-control-shortcuts {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.live2d-hotkey-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: rgba(45, 34, 25, 0.08);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.live2d-hotkey-badge-unsassigned {
+    color: var(--muted);
+}
+
+.live2d-attached-hotkey-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.live2d-attached-hotkey {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.live2d-attached-hotkey-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.live2d-attached-hotkey-title {
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.live2d-hotkey-input-shell {
+    position: relative;
+    margin-top: 2px;
+}
+
+.live2d-hotkey-input {
+    width: 100%;
+    border: 1px solid rgba(87, 57, 34, 0.16);
+    border-radius: 14px;
+    background: var(--panel-strong);
+    color: var(--text);
+    padding: 11px 44px 11px 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    caret-color: transparent;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+.live2d-hotkey-input::placeholder {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.live2d-hotkey-input:focus {
+    outline: none;
+}
+
+.live2d-hotkey-input-shell.is-recording .live2d-hotkey-input,
+.live2d-hotkey-input:focus {
+    border-color: rgba(202, 92, 54, 0.6);
+    box-shadow: 0 0 0 4px rgba(202, 92, 54, 0.12);
+    background: rgba(255, 250, 245, 0.98);
+}
+
+.live2d-hotkey-clear {
+    position: absolute;
+    top: 50%;
+    right: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 999px;
+    transform: translateY(-50%);
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--muted);
+}
+
+.live2d-hotkey-clear:hover {
+    color: var(--text);
+    transform: translateY(-50%);
+}
+
+.live2d-hotkey-clear:disabled {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.live2d-note-input {
+    width: 100%;
+    margin-top: 12px;
+    min-height: 88px;
+    resize: vertical;
+    border: 1px solid rgba(87, 57, 34, 0.16);
+    border-radius: 14px;
+    background: var(--panel-strong);
+    color: var(--text);
+    padding: 12px 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.live2d-note-input:focus {
+    outline: none;
+    border-color: rgba(202, 92, 54, 0.6);
+    box-shadow: 0 0 0 4px rgba(202, 92, 54, 0.12);
+}
+
+.live2d-note-input:disabled {
+    color: var(--muted);
+    background: rgba(255, 246, 236, 0.92);
+}
+
 .stage-background-panel,
 .stage-effects-panel {
     margin-top: 14px;

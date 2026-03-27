@@ -17,6 +17,7 @@ export const DEFAULT_STAGE_RIM_LIGHT_POSITION = Object.freeze({
 export const STAGE_EFFECTS_STORAGE_KEY = "echobot.web.stage.effects.v3";
 export const STAGE_BACKGROUND_STORAGE_KEY = "echobot.web.stage.background";
 export const LIVE2D_SELECTION_STORAGE_KEY = "echobot.web.live2d.selection";
+export const LIVE2D_HOTKEYS_STORAGE_KEY = "echobot.web.live2d.hotkeys_enabled";
 export const LIVE2D_MOUSE_FOLLOW_STORAGE_KEY = "echobot.web.live2d.mouse_follow";
 export const STAGE_PARTICLE_COUNT = 96;
 
